@@ -1,74 +1,167 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+// app/index.tsx
+import React from 'react';
+import { 
+  StyleSheet, 
+  View, 
+  Text, 
+  Image, 
+  TouchableOpacity, 
+  Dimensions, 
+  Platform,
+  SafeAreaView 
+} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+const { width } = Dimensions.get('window');
 
-export default function HomeScreen() {
+export default function Home() {
+  const router = useRouter();
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" />
+      
+      <View style={styles.header}>
+        <Text style={styles.logo}>GabiCam</Text>
+      </View>
+      
+      <View style={styles.imageContainer}>
+        <Image 
+          source={require('../../assets/images/correction.jpg')} 
+          style={styles.image}
+          resizeMode="contain"
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      </View>
+      
+      <View style={styles.infoContainer}>
+        <Text style={styles.title}>Corrija provas facilmente</Text>
+        <Text style={styles.subtitle}>
+          Capture, corrija e gerencie provas com apenas alguns toques
+        </Text>
+      </View>
+      
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity 
+          style={styles.buttonPrimary}
+          onPress={() => router.push('/camera')}
+        >
+          <LinearGradient
+            colors={['#3B5EDE', '#2F4FCD']}
+            style={styles.gradientButton}
+          >
+            <Feather name="camera" size={20} color="#FFFFFF" />
+            <Text style={styles.buttonTextPrimary}>CORRIGIR PROVA</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.buttonSecondary}
+          onPress={() => router.push('/CriarEditarProvaScreen')}
+        >
+          <View style={styles.buttonInner}>
+            <Feather name="edit" size={20} color="#2F4FCD" />
+            <Text style={styles.buttonTextSecondary}>CRIAR/EDITAR PROVA</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+  },
+  header: {
+    marginTop: Platform.OS === 'android' ? 40 : 10,
+    marginBottom: 20,
+  },
+  logo: {
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    color: '#2F4FCD',
+  },
+  imageContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 20,
+  },
+  image: {
+    width: width * 0.8,
+    height: width * 0.8,
+  },
+  infoContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  title: {
+    fontSize: 22,
+    fontFamily: 'Poppins-Bold',
+    color: '#2F4FCD',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#666',
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+  buttonContainer: {
+    marginTop: 20,
+    marginBottom: 30,
+  },
+  buttonPrimary: {
+    height: 56,
+    borderRadius: 16,
+    marginBottom: 15,
+    elevation: 4,
+    shadowColor: '#2F4FCD',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  gradientButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    height: '100%',
+    borderRadius: 16,
+    paddingHorizontal: 20,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  buttonTextPrimary: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    marginLeft: 10,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  buttonSecondary: {
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#DDDBFF',
+  },
+  buttonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    borderRadius: 16,
+    backgroundColor: '#DDDBFF',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: -3, height: -3 },
+    shadowOpacity: 0.8,
+    shadowRadius: 5,
+  },
+  buttonTextSecondary: {
+    color: '#2F4FCD',
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    marginLeft: 10,
   },
 });
