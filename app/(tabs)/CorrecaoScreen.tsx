@@ -15,7 +15,6 @@ import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-// Interface para tipagem das provas e imagens
 interface ProvaImagem {
   id: string;
   provaId: string;

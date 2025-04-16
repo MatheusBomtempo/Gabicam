@@ -7,19 +7,19 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 
 export default function RootLayout() {
-//   const [fontsLoaded] = useFonts({
-//     'Poppins-Bold': require('../assets/fonts/Poppins-Bold.ttf'),
-//     'Poppins-Medium': require('../assets/fonts/Poppins-Medium.ttf'),
-//     'Poppins-Regular': require('../assets/fonts/Poppins-Regular.ttf'),
-//   });
+  // const [fontsLoaded] = useFonts({
+  //   'Poppins-Bold': require('../assets/fonts/Poppins-Bold.ttf'),
+  //   'Poppins-Medium': require('../assets/fonts/Poppins-Medium.ttf'),
+  //   'Poppins-Regular': require('../assets/fonts/Poppins-Regular.ttf'),
+  // });
 
-//   if (!fontsLoaded) {
-//     return (
-//       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-//         <Text>Carregando...</Text>
-//       </View>
-//     );
-//   }
+  // if (!fontsLoaded) {
+  //   return (
+  //     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+  //       <Text>Carregando...</Text>
+  //     </View>
+  //   );
+  // }
 
   return (
     <SafeAreaProvider>
@@ -54,6 +54,15 @@ export default function RootLayout() {
             title: 'Provas',
             tabBarIcon: ({ color }) => (
               <TabBarIcon name="file-text" color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="scan"
+          options={{
+            title: 'Scan',
+            tabBarIcon: ({ color }) => (
+              <TabBarIcon name="camera" color={color} />
             ),
           }}
         />

@@ -46,7 +46,7 @@ export default function Home() {
       <View style={styles.buttonContainer}>
         <TouchableOpacity 
           style={styles.buttonPrimary}
-          onPress={() => router.push('/camera')}
+          onPress={() => router.push('/CorrecaoScreen')}
         >
           <LinearGradient
             colors={['#3B5EDE', '#2F4FCD']}
