@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 
+
 const { width } = Dimensions.get('window');
 
 export default function Home() {
@@ -28,13 +29,13 @@ export default function Home() {
         <Text style={styles.logo}>GabiCam</Text>
       </View>
       
-      <View style={styles.imageContainer}>
+      {/* <View style={styles.imageContainer}>
         <Image 
           source={require('../../assets/images/correction.jpg')} 
           style={styles.image}
           resizeMode="contain"
         />
-      </View>
+      </View> */}
       
       <View style={styles.infoContainer}>
         <Text style={styles.title}>Corrija provas facilmente</Text>
@@ -44,6 +45,33 @@ export default function Home() {
       </View>
       
       <View style={styles.buttonContainer}>
+
+      <TouchableOpacity 
+          style={styles.buttonPrimary}
+          onPress={() => router.push('/CameraProvaScreen')}
+        >
+          <LinearGradient
+            colors={['#3B5EDE', '#2F4FCD']}
+            style={styles.gradientButton}
+          >
+            <Feather name="camera" size={20} color="#FFFFFF" />
+            <Text style={styles.buttonTextPrimary}>TIRAR FOTO</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+      <TouchableOpacity 
+          style={styles.buttonPrimary}
+          onPress={() => router.push('/Loginn')}
+        >
+          <LinearGradient
+            colors={['#3B5EDE', '#2F4FCD']}
+            style={styles.gradientButton}
+          >
+            <Feather name="camera" size={20} color="#FFFFFF" />
+            <Text style={styles.buttonTextPrimary}>Login</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
         <TouchableOpacity 
           style={styles.buttonPrimary}
           onPress={() => router.push('/CorrecaoScreen')}
