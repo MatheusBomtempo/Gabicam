@@ -1,5 +1,5 @@
 // app/camera-prova.tsx
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -21,16 +21,62 @@ import {
   useCameraPermissions
 } from 'expo-camera';
 import { useLocalSearchParams, useRouter, Link } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+interface Prova {
+  id: string;
+  nome: string;
+  dataCriacao: string;
+  fotos: string[];
+  gabarito?: string[];
+}
+
+interface ImagemCapturada {
+  id: string;
+  provaId: string;
+  imageUri: string;
+  dataCriacao: string;
+  status: 'pendente' | 'em_analise' | 'corrigido';
+  resultado?: {
+    acertos: number;
+    total: number;
+    nota: number;
+  };
+}
+
+const PROVAS_STORAGE_KEY = '@GabaritoApp:provas';
+const IMAGENS_STORAGE_KEY = '@GabaritoApp:imagens';
 
 export default function CameraProvaScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [facing, setFacing] = useState<CameraType>('back');
+  const [prova, setProva] = useState<Prova | null>(null);
   
   const cameraRef = useRef<CameraView>(null);
   const router = useRouter();
   const { provaId } = useLocalSearchParams();
+
+  useEffect(() => {
+    carregarProva();
+  }, []);
+
+  const carregarProva = async () => {
+    try {
+      const provasArmazenadas = await AsyncStorage.getItem(PROVAS_STORAGE_KEY);
+      if (provasArmazenadas) {
+        const provas: Prova[] = JSON.parse(provasArmazenadas);
+        const provaAtual = provas.find(p => p.id === provaId);
+        if (provaAtual) {
+          setProva(provaAtual);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar prova:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os dados da prova');
+    }
+  };
   
   // Verificação de permissão
   if (!permission) {
@@ -56,11 +102,24 @@ export default function CameraProvaScreen() {
   }
 
   const captureImage = async () => {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current) {
+      console.log('Camera ref não disponível');
+      return;
+    }
     
     try {
-      const photo = await cameraRef.current.takePictureAsync();
-      setCapturedImage(photo.uri);
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 1,
+        base64: false,
+        skipProcessing: true,
+      });
+      
+      if (photo && photo.uri) {
+        console.log('Foto capturada:', photo.uri);
+        setCapturedImage(photo.uri);
+      } else {
+        throw new Error('Foto não capturada corretamente');
+      }
     } catch (error) {
       console.error('Erro ao capturar imagem:', error);
       Alert.alert('Erro', 'Não foi possível capturar a imagem.');
@@ -72,30 +131,50 @@ export default function CameraProvaScreen() {
   };
 
   const salvarImagem = async () => {
-    if (!capturedImage) return;
+    if (!capturedImage) {
+      Alert.alert('Erro', 'Nenhuma imagem capturada');
+      return;
+    }
     
     try {
       setIsSaving(true);
       
-      // Simulação de upload para API
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Criar objeto da imagem capturada
+      const novaImagem: ImagemCapturada = {
+        id: Date.now().toString(),
+        provaId: provaId as string,
+        imageUri: capturedImage,
+        dataCriacao: new Date().toLocaleDateString('pt-BR'),
+        status: 'pendente'
+      };
+
+      // Carregar imagens existentes
+      const imagensArmazenadas = await AsyncStorage.getItem(IMAGENS_STORAGE_KEY);
+      let imagens: ImagemCapturada[] = [];
       
-      // Aqui você faria o upload real da imagem para sua API
-      // const formData = new FormData();
-      // formData.append('provaId', provaId as string);
-      // formData.append('image', {
-      //   uri: capturedImage,
-      //   type: 'image/jpeg',
-      //   name: 'prova_imagem.jpg'
-      // });
-      // 
-      // const response = await fetch('SUA_API_URL/upload', {
-      //   method: 'POST',
-      //   body: formData,
-      //   headers: {
-      //     'Content-Type': 'multipart/form-data',
-      //   }
-      // });
+      if (imagensArmazenadas) {
+        imagens = JSON.parse(imagensArmazenadas);
+      }
+
+      // Adicionar nova imagem
+      imagens.push(novaImagem);
+      await AsyncStorage.setItem(IMAGENS_STORAGE_KEY, JSON.stringify(imagens));
+
+      // Atualizar a prova com a referência da nova foto
+      const provasArmazenadas = await AsyncStorage.getItem(PROVAS_STORAGE_KEY);
+      if (provasArmazenadas) {
+        const provas: Prova[] = JSON.parse(provasArmazenadas);
+        const provasAtualizadas = provas.map(p => {
+          if (p.id === provaId) {
+            return {
+              ...p,
+              fotos: [...(p.fotos || []), novaImagem.id]
+            };
+          }
+          return p;
+        });
+        await AsyncStorage.setItem(PROVAS_STORAGE_KEY, JSON.stringify(provasAtualizadas));
+      }
       
       Alert.alert(
         'Sucesso', 
@@ -104,13 +183,17 @@ export default function CameraProvaScreen() {
       );
     } catch (error) {
       console.error('Erro ao salvar imagem:', error);
-      Alert.alert('Erro', 'Não foi possível salvar a imagem.');
+      Alert.alert('Erro', `Não foi possível salvar a imagem: ${error.message}`);
     } finally {
       setIsSaving(false);
     }
   };
 
   const renderPreview = () => {
+    if (!capturedImage) {
+      return null;
+    }
+
     return (
       <View style={styles.previewContainer}>
         <Image 
@@ -131,7 +214,10 @@ export default function CameraProvaScreen() {
           
           <TouchableOpacity 
             style={[styles.previewButton, styles.saveButton]}
-            onPress={salvarImagem}
+            onPress={() => {
+              console.log('Botão salvar pressionado');
+              salvarImagem();
+            }}
             disabled={isSaving}
           >
             {isSaving ? (
@@ -154,8 +240,8 @@ export default function CameraProvaScreen() {
         <CameraView
           style={styles.camera}
           ref={cameraRef}
-          mode="picture"
           facing={facing}
+          mode="picture"
           mute={true}
           enableZoomGesture
           responsiveOrientationWhenOrientationLocked

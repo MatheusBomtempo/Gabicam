@@ -14,8 +14,18 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
 
-interface ProvaImagem {
+interface Prova {
+  id: string;
+  nome: string;
+  dataCriacao: string;
+  fotos: string[];
+  gabarito?: string[];
+}
+
+interface ImagemCapturada {
   id: string;
   provaId: string;
   imageUri: string;
@@ -28,100 +38,143 @@ interface ProvaImagem {
   };
 }
 
-// Dados simulados para a listagem
-const IMAGENS_MOCKUP: ProvaImagem[] = [
-  {
-    id: '1',
-    provaId: '1',
-    imageUri: 'https://via.placeholder.com/300x400',
-    dataCriacao: '06/04/2025',
-    status: 'corrigido',
-    resultado: {
-      acertos: 8,
-      total: 10,
-      nota: 8.0
-    }
-  },
-  {
-    id: '2',
-    provaId: '2',
-    imageUri: 'https://via.placeholder.com/300x400',
-    dataCriacao: '06/04/2025',
-    status: 'em_analise'
-  },
-  {
-    id: '3',
-    provaId: '1',
-    imageUri: 'https://via.placeholder.com/300x400',
-    dataCriacao: '05/04/2025',
-    status: 'pendente'
-  }
-];
+const PROVAS_STORAGE_KEY = '@GabaritoApp:provas';
+const IMAGENS_STORAGE_KEY = '@GabaritoApp:imagens';
+const API_URL = 'http://127.0.0.1:5000/corrigir';
 
 export default function CorrecaoScreen() {
-  const [imagens, setImagens] = useState<ProvaImagem[]>([]);
+  const [imagens, setImagens] = useState<ImagemCapturada[]>([]);
+  const [provas, setProvas] = useState<Prova[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   
   useEffect(() => {
-    // Simulando carregamento de dados da API
-    const carregarDados = async () => {
-      try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setImagens(IMAGENS_MOCKUP);
-      } catch (error) {
-        console.error('Erro ao carregar imagens:', error);
-        Alert.alert('Erro', 'Não foi possível carregar as imagens das provas.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
     carregarDados();
   }, []);
-  
-  const iniciarCorrecao = (item: ProvaImagem) => {
+
+  const carregarDados = async () => {
+    try {
+      // Carregar provas
+      const provasArmazenadas = await AsyncStorage.getItem(PROVAS_STORAGE_KEY);
+      let provasData: Prova[] = [];
+      if (provasArmazenadas) {
+        provasData = JSON.parse(provasArmazenadas);
+        setProvas(provasData);
+      }
+
+      // Carregar imagens
+      const imagensArmazenadas = await AsyncStorage.getItem(IMAGENS_STORAGE_KEY);
+      if (imagensArmazenadas) {
+        setImagens(JSON.parse(imagensArmazenadas));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os dados.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const salvarImagens = async (imagensAtualizadas: ImagemCapturada[]) => {
+    try {
+      await AsyncStorage.setItem(IMAGENS_STORAGE_KEY, JSON.stringify(imagensAtualizadas));
+    } catch (error) {
+      console.error('Erro ao salvar imagens:', error);
+    }
+  };
+
+  const iniciarCorrecao = async (item: ImagemCapturada) => {
     if (item.status === 'pendente') {
-      // Simula envio para API
-      const atualizaStatus = async () => {
-        try {
-          setImagens(imagens.map(img => 
-            img.id === item.id ? { ...img, status: 'em_analise' } : img
-          ));
-          
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Após receber a resposta da API, atualiza para corrigido com resultado
-          setImagens(imagens.map(img => 
-            img.id === item.id ? {
-              ...img,
-              status: 'corrigido',
-              resultado: {
-                acertos: 7,
-                total: 10,
-                nota: 7.0
-              }
-            } : img
-          ));
-          
-          // Navegaria para tela de detalhes da correção
-          // router.push(`/detalhes-correcao/${item.id}`);
-          
-        } catch (error) {
-          console.error('Erro ao processar correção:', error);
-          Alert.alert('Erro', 'Não foi possível processar a correção.');
+      try {
+        // Atualizar status para em_analise
+        const imagensAtualizadas = imagens.map(img => 
+          img.id === item.id ? { ...img, status: 'em_analise' as const } : img
+        );
+        setImagens(imagensAtualizadas);
+        await salvarImagens(imagensAtualizadas);
+
+        // Encontrar a prova associada
+        const prova = provas.find(p => p.id === item.provaId);
+        if (!prova || !prova.gabarito) {
+          Alert.alert('Erro', 'Prova ou gabarito não encontrado.');
+          return;
         }
-      };
-      
-      atualizaStatus();
+
+        // Preparar dados para API
+        const formData = new FormData();
+        
+        // Converter imagem URI para arquivo
+        const fileInfo = await FileSystem.getInfoAsync(item.imageUri);
+        if (!fileInfo.exists) {
+          throw new Error('Arquivo de imagem não encontrado');
+        }
+
+        // Adicionar imagem ao FormData
+        formData.append('imagem', {
+          uri: item.imageUri,
+          type: 'image/jpeg',
+          name: `prova_${item.id}.jpg`
+        } as any);
+        
+        // Adicionar gabarito
+        formData.append('gabarito', prova.gabarito.join(''));
+
+        // Enviar para API de correção
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Erro na resposta da API');
+        }
+
+        const resultado = await response.json();
+
+        // Atualizar status para corrigido com resultado
+        const imagensFinais = imagens.map(img => 
+          img.id === item.id ? {
+            ...img,
+            status: 'corrigido' as const,
+            resultado: {
+              acertos: resultado.acertos,
+              total: resultado.total_questoes,
+              nota: (resultado.acertos / resultado.total_questoes) * 10
+            }
+          } : img
+        );
+        
+        setImagens(imagensFinais);
+        await salvarImagens(imagensFinais);
+        
+        Alert.alert(
+          'Correção Concluída',
+          `Nota: ${((resultado.acertos / resultado.total_questoes) * 10).toFixed(1)}\nAcertos: ${resultado.acertos}/${resultado.total_questoes}`
+        );
+        
+      } catch (error) {
+        console.error('Erro ao processar correção:', error);
+        // Reverter para status pendente em caso de erro
+        const imagensAtualizadas = imagens.map(img => 
+          img.id === item.id ? { ...img, status: 'pendente' as const } : img
+        );
+        setImagens(imagensAtualizadas);
+        await salvarImagens(imagensAtualizadas);
+        Alert.alert('Erro', 'Não foi possível processar a correção.');
+      }
     } else if (item.status === 'corrigido') {
-      // Navegaria para tela de detalhes da correção
-      // router.push(`/detalhes-correcao/${item.id}`);
-      Alert.alert('Detalhes', 'Abre a tela de detalhes da correção.');
+      // Mostrar detalhes da correção
+      Alert.alert(
+        'Detalhes da Correção',
+        `Nota: ${item.resultado?.nota.toFixed(1)}\nAcertos: ${item.resultado?.acertos}/${item.resultado?.total}`
+      );
     }
   };
   
-  const renderStatusBadge = (status: ProvaImagem['status']) => {
+  const renderStatusBadge = (status: ImagemCapturada['status']) => {
     let backgroundColor, textColor, label;
     
     switch (status) {
@@ -173,7 +226,7 @@ export default function CorrecaoScreen() {
           </Text>
           <TouchableOpacity 
             style={styles.capturarButton}
-            onPress={() => router.push('/criar-editar-prova')}
+            onPress={() => router.push('/CriarEditarProvaScreen')}
           >
             <Text style={styles.capturarButtonText}>Ir para minhas provas</Text>
           </TouchableOpacity>

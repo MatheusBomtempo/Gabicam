@@ -1,27 +1,30 @@
 // app/criar-editar-prova.tsx
-import React, { useState } from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  FlatList, 
+import React, { useState, useEffect } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  FlatList,
   Modal,
   TextInput,
   Alert,
-  SafeAreaView 
+  SafeAreaView,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
 import { Link } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Interface para tipagem das provas
 interface Prova {
   id: string;
   nome: string;
-  datacricao: string;
+  dataCriacao: string;
   fotos: string[];
 }
+
+const STORAGE_KEY = '@GabaritoApp:provas';
 
 export default function CriarEditarProvaScreen() {
   const [provas, setProvas] = useState<Prova[]>([]);
@@ -31,8 +34,36 @@ export default function CriarEditarProvaScreen() {
   const [novaProva, setNovaProva] = useState('');
   const [provaEmEdicao, setProvaEmEdicao] = useState<Prova | null>(null);
 
+  // Carregar provas do AsyncStorage quando o componente montar
+  useEffect(() => {
+    carregarProvas();
+  }, []);
+
+  // Função para carregar provas do AsyncStorage
+  const carregarProvas = async () => {
+    try {
+      const provasArmazenadas = await AsyncStorage.getItem(STORAGE_KEY);
+      if (provasArmazenadas !== null) {
+        setProvas(JSON.parse(provasArmazenadas));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar provas:', error);
+      Alert.alert('Erro', 'Não foi possível carregar as provas salvas');
+    }
+  };
+
+  // Função para salvar provas no AsyncStorage
+  const salvarProvas = async (novasProvas: Prova[]) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(novasProvas));
+    } catch (error) {
+      console.error('Erro ao salvar provas:', error);
+      Alert.alert('Erro', 'Não foi possível salvar as provas');
+    }
+  };
+
   // Função para criar uma nova prova
-  const criarNovaProva = () => {
+  const criarNovaProva = async () => {
     if (novaProva.trim() === '') {
       Alert.alert('Erro', 'O nome da prova não pode estar vazio');
       return;
@@ -41,66 +72,68 @@ export default function CriarEditarProvaScreen() {
     const novaProvaObj: Prova = {
       id: Date.now().toString(),
       nome: novaProva,
-      dataricao: new Date().toLocaleDateString('pt-BR'),
-      fotos: []
+      dataCriacao: new Date().toLocaleDateString('pt-BR'),
+      fotos: [],
     };
 
-    setProvas([...provas, novaProvaObj]);
+    const provasAtualizadas = [...provas, novaProvaObj];
+    setProvas(provasAtualizadas);
+    await salvarProvas(provasAtualizadas);
     setNovaProva('');
     setModalVisible(false);
   };
 
   // Função para renomear uma prova
-  const renomearProva = () => {
+  const renomearProva = async () => {
     if (!provaEmEdicao) return;
     if (provaEmEdicao.nome.trim() === '') {
       Alert.alert('Erro', 'O nome da prova não pode estar vazio');
       return;
     }
 
-    setProvas(provas.map(p => 
+    const provasAtualizadas = provas.map((p) => 
       p.id === provaEmEdicao.id ? provaEmEdicao : p
-    ));
+    );
+    setProvas(provasAtualizadas);
+    await salvarProvas(provasAtualizadas);
     setEditModalVisible(false);
     setProvaEmEdicao(null);
   };
 
   // Função para apagar uma prova
   const apagarProva = (id: string) => {
-    Alert.alert(
-      'Confirmação',
-      'Tem certeza que deseja excluir esta prova?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel'
+    Alert.alert('Confirmação', 'Tem certeza que deseja excluir esta prova?', [
+      {
+        text: 'Cancelar',
+        style: 'cancel',
+      },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          const provasAtualizadas = provas.filter((p) => p.id !== id);
+          setProvas(provasAtualizadas);
+          await salvarProvas(provasAtualizadas);
+          setActionMenuVisible(null);
         },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: () => {
-            setProvas(provas.filter(p => p.id !== id));
-            setActionMenuVisible(null);
-          }
-        }
-      ]
-    );
+      },
+    ]);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      
+
       <View style={styles.header}>
         <Text style={styles.title}>Minhas Provas</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.addButton}
           onPress={() => setModalVisible(true)}
         >
           <Feather name="plus" size={24} color="#2F4FCD" />
         </TouchableOpacity>
       </View>
-      
+
       {provas.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconContainer}>
@@ -118,30 +151,51 @@ export default function CriarEditarProvaScreen() {
           contentContainerStyle={styles.listContainer}
           renderItem={({ item }) => (
             <View style={styles.provaContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.provaCard}
                 onPress={() => {
-                  // Aqui você navegaria para a tela de detalhes da prova
-                  // Por enquanto, vamos apenas alternar o menu de ações
-                  setActionMenuVisible(actionMenuVisible === item.id ? null : item.id);
+                  setActionMenuVisible(
+                    actionMenuVisible === item.id ? null : item.id
+                  );
                 }}
               >
                 <View style={styles.provaInfo}>
-                  <Feather name="file-text" size={24} color="#2F4FCD" style={styles.provaIcon} />
+                  <Feather
+                    name="file-text"
+                    size={24}
+                    color="#2F4FCD"
+                    style={styles.provaIcon}
+                  />
                   <View>
                     <Text style={styles.provaNome}>{item.nome}</Text>
-                    <Text style={styles.provaData}>Criada em: {item.dataricao}</Text>
+                    <Text style={styles.provaData}>
+                      Criada em: {item.dataCriacao}
+                    </Text>
                     <Text style={styles.provaFotos}>
-                      {item.fotos.length} foto{item.fotos.length !== 1 ? 's' : ''}
+                      {item.fotos.length} foto
+                      {item.fotos.length !== 1 ? 's' : ''}
                     </Text>
                   </View>
                 </View>
                 <Feather name="more-vertical" size={24} color="#2F4FCD" />
               </TouchableOpacity>
-              
+
               {actionMenuVisible === item.id && (
                 <View style={styles.actionMenu}>
-                  <TouchableOpacity 
+                  <Link
+                    href={{
+                      pathname: '/CadastrarQuestoes',
+                      params: { provaId: item.id },
+                    }}
+                    asChild
+                  >
+                    <TouchableOpacity style={styles.actionButton}>
+                      <Feather name="plus" size={18} color="#2F4FCD" />
+                      <Text style={styles.actionText}>Criar Gabarito</Text>
+                    </TouchableOpacity>
+                  </Link>
+
+                  <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => {
                       setProvaEmEdicao(item);
@@ -152,20 +206,15 @@ export default function CriarEditarProvaScreen() {
                     <Feather name="edit" size={18} color="#2F4FCD" />
                     <Text style={styles.actionText}>Renomear</Text>
                   </TouchableOpacity>
-                  
-                  <Link href={{ pathname: "/CameraProvaScreen", params: { provaId: item.id } }} asChild>
-                    <TouchableOpacity style={styles.actionButton}>
-                      <Feather name="camera" size={18} color="#2F4FCD" />
-                      <Text style={styles.actionText}>Adicionar foto</Text>
-                    </TouchableOpacity>
-                  </Link>
-                  
-                  <TouchableOpacity 
+
+                  <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => apagarProva(item.id)}
                   >
                     <Feather name="trash-2" size={18} color="#FF6B6B" />
-                    <Text style={[styles.actionText, styles.deleteText]}>Excluir</Text>
+                    <Text style={[styles.actionText, styles.deleteText]}>
+                      Excluir
+                    </Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -173,7 +222,7 @@ export default function CriarEditarProvaScreen() {
           )}
         />
       )}
-      
+
       {/* Modal para criar nova prova */}
       <Modal
         animationType="fade"
@@ -184,7 +233,7 @@ export default function CriarEditarProvaScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Nova Prova</Text>
-            
+
             <TextInput
               style={styles.input}
               placeholder="Nome da prova"
@@ -192,9 +241,9 @@ export default function CriarEditarProvaScreen() {
               onChangeText={setNovaProva}
               autoFocus
             />
-            
+
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setNovaProva('');
@@ -203,8 +252,8 @@ export default function CriarEditarProvaScreen() {
               >
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[styles.modalButton, styles.confirmButton]}
                 onPress={criarNovaProva}
               >
@@ -214,7 +263,7 @@ export default function CriarEditarProvaScreen() {
           </View>
         </View>
       </Modal>
-      
+
       {/* Modal para editar prova */}
       <Modal
         animationType="fade"
@@ -225,21 +274,21 @@ export default function CriarEditarProvaScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Renomear Prova</Text>
-            
+
             <TextInput
               style={styles.input}
               placeholder="Nome da prova"
               value={provaEmEdicao?.nome || ''}
-              onChangeText={(text) => 
-                setProvaEmEdicao(prev => 
+              onChangeText={(text) =>
+                setProvaEmEdicao((prev) =>
                   prev ? { ...prev, nome: text } : null
                 )
               }
               autoFocus
             />
-            
+
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setProvaEmEdicao(null);
@@ -248,8 +297,8 @@ export default function CriarEditarProvaScreen() {
               >
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[styles.modalButton, styles.confirmButton]}
                 onPress={renomearProva}
               >
