@@ -1,3 +1,4 @@
+// app/camera-prova.tsx
 import React, { useRef, useState, useEffect } from 'react';
 import { 
   StyleSheet, 
@@ -27,7 +28,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface Prova {
   id: string;
@@ -43,7 +44,7 @@ interface ImagemCapturada {
   nomeAluno: string;
   nomeProva: string;
   imageUri: string;
-  imageCroppedUri?: string; // Imagem recortada
+  imageCroppedUri?: string; // Nova propriedade para a imagem recortada
   dataCriacao: string;
   status: 'pendente' | 'em_analise' | 'corrigido';
   resultado?: {
@@ -69,20 +70,12 @@ export default function CameraProvaScreen() {
   const [showCamera, setShowCamera] = useState(false);
   const [flashMode, setFlashMode] = useState('off');
   
-  // Configuração da área de sangria/recorte
-  // Essas proporções são baseadas no exemplo do gabarito mostrado
-  const [frameRatio, setFrameRatio] = useState({
-    widthRatio: 0.7,  // Porcentagem da largura da tela para o frame
-    heightRatio: 0.4, // Proporção baseada na área apenas do gabarito, não da folha toda
-    aspectRatio: 1,   // Inicia com proporção 1:1 (quadrado)
-  });
-  
   const cameraRef = useRef<CameraView>(null);
   const router = useRouter();
 
-  // Cálculo das dimensões do frame baseado na proporção desejada
-  const frameWidth = SCREEN_WIDTH * frameRatio.widthRatio;
-  const frameHeight = frameWidth * frameRatio.heightRatio;
+  // Dimensões para o quadro de recorte - ajustado para proporção da folha A4 com o gabarito
+  const FRAME_WIDTH = SCREEN_WIDTH * 0.85;
+  const FRAME_HEIGHT = FRAME_WIDTH * 1.2; // Proporção aproximada do gabarito na imagem de exemplo
 
   useEffect(() => {
     carregarProvas();
@@ -142,7 +135,7 @@ export default function CameraProvaScreen() {
     );
   }
 
-  // Função para recortar especificamente a área do gabarito (sangria)
+  // Função para recortar apenas a área do gabarito
   const cropGabaritoArea = async (imageUri: string) => {
     try {
       setIsProcessing(true);
@@ -154,44 +147,51 @@ export default function CameraProvaScreen() {
         });
       });
       
-      // Calcula as dimensões do frame de recorte em relação à imagem capturada
-      const viewRatio = photoWidth / SCREEN_WIDTH;
-      
-      // Calcula o centro da imagem
+      // Calcula as coordenadas para o recorte centralizado na imagem
+      // Temos que mapear as coordenadas da view para as coordenadas reais da imagem
+      // Aproximadamente, assumindo que a câmera está centralizada
+      const viewWidth = SCREEN_WIDTH;
       const centerX = photoWidth / 2;
       const centerY = photoHeight / 2;
       
-      // Calcula as dimensões do recorte baseadas na proporção do frame
-      const cropWidth = frameWidth * viewRatio;
-      const cropHeight = frameHeight * viewRatio;
+      // Largura e altura do recorte na imagem (baseado na proporção da moldura na tela)
+      const cropWidth = (FRAME_WIDTH / viewWidth) * photoWidth;
+      const cropHeight = (FRAME_HEIGHT / viewWidth) * photoWidth; // mantém a proporção
       
-      // Calcula as coordenadas de origem do recorte, centralizando na imagem
-      const originX = Math.max(0, centerX - (cropWidth / 2));
-      const originY = Math.max(0, centerY - (cropHeight / 2));
+      // Coordenadas para o recorte
+      const originX = centerX - (cropWidth / 2);
+      const originY = centerY - (cropHeight / 2);
       
       console.log('Dimensões da imagem:', photoWidth, photoHeight);
       console.log('Dimensões do recorte:', cropWidth, cropHeight);
       console.log('Origem do recorte:', originX, originY);
       
-      // Realiza o recorte com valores arredondados para evitar erros
-      const cropResult = await ImageManipulator.manipulateAsync(
+      // Aplica o recorte
+      const manipResult = await ImageManipulator.manipulateAsync(
         imageUri,
         [
           {
             crop: {
-              originX: Math.round(originX),
-              originY: Math.round(originY),
-              width: Math.round(Math.min(cropWidth, photoWidth - originX)),
-              height: Math.round(Math.min(cropHeight, photoHeight - originY))
-            }
+              originX: Math.max(0, originX),
+              originY: Math.max(0, originY),
+              width: Math.min(cropWidth, photoWidth - originX),
+              height: Math.min(cropHeight, photoHeight - originY),
+            },
           }
         ],
-        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
       );
       
-      console.log('Imagem recortada:', cropResult.uri);
-      setCroppedImage(cropResult.uri);
-      return cropResult.uri;
+      // Simplificando - apenas usando as operações básicas suportadas
+      const enhancedResult = await ImageManipulator.manipulateAsync(
+        manipResult.uri,
+        [],  // Sem operações adicionais
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      
+      console.log('Imagem recortada e melhorada:', enhancedResult.uri);
+      setCroppedImage(enhancedResult.uri);
+      return enhancedResult.uri;
     } catch (error) {
       console.error('Erro ao recortar imagem:', error);
       Alert.alert('Erro', 'Não foi possível processar a imagem. Tente novamente.');
@@ -211,7 +211,7 @@ export default function CameraProvaScreen() {
       const photo = await cameraRef.current.takePictureAsync({
         quality: 1,
         base64: false,
-        skipProcessing: true,
+        skipProcessing: false, // Permitir processamento da imagem
       });
       
       if (photo && photo.uri) {
@@ -219,7 +219,10 @@ export default function CameraProvaScreen() {
         setCapturedImage(photo.uri);
         
         // Inicia o processamento da imagem automaticamente
-        cropGabaritoArea(photo.uri);
+        const croppedUri = await cropGabaritoArea(photo.uri);
+        if (croppedUri) {
+          setCroppedImage(croppedUri);
+        }
       } else {
         throw new Error('Foto não capturada corretamente');
       }
@@ -243,11 +246,6 @@ export default function CameraProvaScreen() {
       return;
     }
     
-    if (!croppedImage) {
-      Alert.alert('Erro', 'A imagem ainda está sendo processada');
-      return;
-    }
-    
     try {
       setIsSaving(true);
       
@@ -264,7 +262,7 @@ export default function CameraProvaScreen() {
         nomeAluno: nomeAluno.trim(),
         nomeProva: provaSelecionada.nome,
         imageUri: capturedImage,
-        imageCroppedUri: croppedImage,
+        imageCroppedUri: croppedImage || undefined, // Inclui a versão recortada
         dataCriacao: new Date().toLocaleDateString('pt-BR'),
         status: 'pendente'
       };
@@ -383,7 +381,7 @@ export default function CameraProvaScreen() {
 
     return (
       <View style={styles.previewContainer}>
-        {/* Exibe imagem original e recortada */}
+        {/* Mostra tanto a imagem original quanto a recortada */}
         <View style={styles.previewImages}>
           <View style={styles.previewImageContainer}>
             <Text style={styles.previewLabel}>Imagem Original</Text>
@@ -394,19 +392,14 @@ export default function CameraProvaScreen() {
             />
           </View>
           
-          {croppedImage ? (
+          {croppedImage && (
             <View style={styles.previewImageContainer}>
-              <Text style={styles.previewLabel}>Área do Gabarito</Text>
+              <Text style={styles.previewLabel}>Área Recortada</Text>
               <Image 
                 source={{ uri: croppedImage }} 
                 style={styles.previewImageSplit}
                 resizeMode="contain"
               />
-            </View>
-          ) : (
-            <View style={styles.previewImageContainer}>
-              <Text style={styles.previewLabel}>Processando...</Text>
-              <ActivityIndicator size="large" color="#2F4FCD" />
             </View>
           )}
         </View>
@@ -418,22 +411,18 @@ export default function CameraProvaScreen() {
               setCapturedImage(null);
               setCroppedImage(null);
             }}
-            disabled={isSaving || isProcessing}
+            disabled={isSaving}
           >
             <Feather name="refresh-ccw" size={20} color="#FF6B6B" />
             <Text style={styles.cancelText}>Capturar novamente</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[
-              styles.previewButton, 
-              styles.saveButton,
-              (isSaving || isProcessing || !croppedImage) && styles.saveButtonDisabled
-            ]}
+            style={[styles.previewButton, styles.saveButton]}
             onPress={salvarImagem}
-            disabled={isSaving || isProcessing || !croppedImage}
+            disabled={isSaving || isProcessing}
           >
-            {isSaving ? (
+            {isSaving || isProcessing ? (
               <ActivityIndicator size="small" color="#FFF" />
             ) : (
               <>
@@ -454,76 +443,62 @@ export default function CameraProvaScreen() {
           style={styles.camera}
           ref={cameraRef}
           facing={facing}
-          flash={flashMode}
           mode="picture"
+          mute={true}
           enableZoomGesture
+          flash={flashMode}
+          responsiveOrientationWhenOrientationLocked
         >
-          <TouchableOpacity 
-            style={styles.closeButton}
-            onPress={() => setShowCamera(false)}
-          >
-            <Feather name="x" size={28} color="white" />
-          </TouchableOpacity>
-          
           <View style={styles.overlayContainer}>
-            {/* Moldura de guia otimizada para a área do gabarito */}
+            {/* Moldura melhorada com proporção mais adequada para o gabarito */}
             <View style={[
               styles.frameGuide, 
               { 
-                width: frameWidth, 
-                height: frameHeight,
-                // Posiciona o frame um pouco mais para baixo para acomodar o gabarito
-                top: 40 
+                width: FRAME_WIDTH, 
+                height: FRAME_HEIGHT 
               }
             ]}>
-              {/* Cantos da moldura */}
               <View style={styles.cornerTL} />
               <View style={styles.cornerTR} />
               <View style={styles.cornerBL} />
               <View style={styles.cornerBR} />
               
-              {/* Linhas internas de guia para alinhar com o gabarito */}
+              {/* Linhas de grade para ajudar no alinhamento */}
               <View style={styles.gridLineHorizontal} />
               <View style={styles.gridLineVertical} />
             </View>
-            
             <Text style={styles.guideText}>
-              Alinhe APENAS A GRADE do gabarito na moldura
+              Alinhe o gabarito dentro da moldura
             </Text>
           </View>
           
-          <View style={styles.cameraControls}>
-            <TouchableOpacity 
-              style={styles.cameraControlButton} 
-              onPress={toggleFacing}
-            >
-              <Feather name="refresh-cw" size={24} color="white" />
-            </TouchableOpacity>
+          <View style={styles.shutterContainer}>
+            <Pressable onPress={() => setShowCamera(false)}>
+              <Feather name="x" size={32} color="white" />
+            </Pressable>
             
-            <TouchableOpacity 
-              style={styles.shutterButton}
-              onPress={captureImage}
-            >
-              <View style={styles.shutterButtonInner} />
-            </TouchableOpacity>
+            <Pressable onPress={captureImage}>
+              {({ pressed }) => (
+                <View
+                  style={[
+                    styles.shutterBtn,
+                    {
+                      opacity: pressed ? 0.7 : 1,
+                    },
+                  ]}
+                >
+                  <View style={styles.shutterBtnInner} />
+                </View>
+              )}
+            </Pressable>
             
-            <TouchableOpacity 
-              style={styles.cameraControlButton} 
-              onPress={toggleFlash}
-            >
+            <Pressable onPress={toggleFlash}>
               <Feather 
                 name={flashMode === 'off' ? "zap-off" : "zap"} 
-                size={24} 
+                size={32} 
                 color="white" 
               />
-            </TouchableOpacity>
-          </View>
-          
-          {/* Dicas para melhorar a captura */}
-          <View style={styles.tipContainer}>
-            <Text style={styles.tipText}>
-              Dica: Capture apenas a grade de múltipla escolha com as marcações
-            </Text>
+            </Pressable>
           </View>
         </CameraView>
       </>
