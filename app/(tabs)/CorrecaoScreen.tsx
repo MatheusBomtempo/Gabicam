@@ -28,6 +28,8 @@ interface Prova {
 interface ImagemCapturada {
   id: string;
   provaId: string;
+  nomeAluno: string;
+  nomeProva: string;
   imageUri: string;
   dataCriacao: string;
   status: 'pendente' | 'em_analise' | 'corrigido';
@@ -40,7 +42,7 @@ interface ImagemCapturada {
 
 const PROVAS_STORAGE_KEY = '@GabaritoApp:provas';
 const IMAGENS_STORAGE_KEY = '@GabaritoApp:imagens';
-const API_URL = 'http://127.0.0.1:5000/corrigir';
+const API_URL = 'http://192.168.2.103:5000/corrigir';
 
 export default function CorrecaoScreen() {
   const [imagens, setImagens] = useState<ImagemCapturada[]>([]);
@@ -97,42 +99,54 @@ export default function CorrecaoScreen() {
         const prova = provas.find(p => p.id === item.provaId);
         if (!prova || !prova.gabarito) {
           Alert.alert('Erro', 'Prova ou gabarito não encontrado.');
+          
+          // Reverter status para pendente
+          const imagensRevertidas = imagens.map(img => 
+            img.id === item.id ? { ...img, status: 'pendente' as const } : img
+          );
+          setImagens(imagensRevertidas);
+          await salvarImagens(imagensRevertidas);
           return;
         }
 
         // Preparar dados para API
         const formData = new FormData();
         
-        // Converter imagem URI para arquivo
-        const fileInfo = await FileSystem.getInfoAsync(item.imageUri);
-        if (!fileInfo.exists) {
-          throw new Error('Arquivo de imagem não encontrado');
-        }
-
+        // Extrair nome do arquivo da URI
+        const fileNameFromUri = item.imageUri.split('/').pop();
+        
         // Adicionar imagem ao FormData
         formData.append('imagem', {
           uri: item.imageUri,
           type: 'image/jpeg',
-          name: `prova_${item.id}.jpg`
+          name: fileNameFromUri || `prova_${item.id}.jpg`
         } as any);
         
-        // Adicionar gabarito
+        // Adicionar gabarito como uma string única
         formData.append('gabarito', prova.gabarito.join(''));
+
+        console.log('Enviando para API:', {
+          uri: item.imageUri,
+          gabarito: prova.gabarito.join('')
+        });
 
         // Enviar para API de correção
         const response = await fetch(API_URL, {
           method: 'POST',
           body: formData,
           headers: {
-            'Content-Type': 'multipart/form-data',
+            'Accept': 'application/json',
+            // Remover 'Content-Type' quando usando FormData
           },
         });
 
         if (!response.ok) {
-          throw new Error('Erro na resposta da API');
+          const errorText = await response.text();
+          throw new Error(`Erro na resposta da API: ${response.status} - ${errorText}`);
         }
 
         const resultado = await response.json();
+        console.log('Resultado da API:', resultado);
 
         // Atualizar status para corrigido com resultado
         const imagensFinais = imagens.map(img => 
@@ -152,7 +166,7 @@ export default function CorrecaoScreen() {
         
         Alert.alert(
           'Correção Concluída',
-          `Nota: ${((resultado.acertos / resultado.total_questoes) * 10).toFixed(1)}\nAcertos: ${resultado.acertos}/${resultado.total_questoes}`
+          `Aluno: ${item.nomeAluno}\nNota: ${((resultado.acertos / resultado.total_questoes) * 10).toFixed(1)}\nAcertos: ${resultado.acertos}/${resultado.total_questoes}`
         );
         
       } catch (error) {
@@ -163,13 +177,18 @@ export default function CorrecaoScreen() {
         );
         setImagens(imagensAtualizadas);
         await salvarImagens(imagensAtualizadas);
-        Alert.alert('Erro', 'Não foi possível processar a correção.');
+        Alert.alert('Erro', `Não foi possível processar a correção: ${error.message}`);
       }
     } else if (item.status === 'corrigido') {
       // Mostrar detalhes da correção
       Alert.alert(
         'Detalhes da Correção',
-        `Nota: ${item.resultado?.nota.toFixed(1)}\nAcertos: ${item.resultado?.acertos}/${item.resultado?.total}`
+        `Aluno: ${item.nomeAluno}\nProva: ${item.nomeProva}\nNota: ${item.resultado?.nota.toFixed(1)}\nAcertos: ${item.resultado?.acertos}/${item.resultado?.total}`
+      );
+    } else if (item.status === 'em_analise') {
+      Alert.alert(
+        'Processando',
+        'Esta prova já está sendo processada. Aguarde a conclusão.'
       );
     }
   };
@@ -249,6 +268,8 @@ export default function CorrecaoScreen() {
                 />
                 
                 <View style={styles.imagemInfo}>
+                  <Text style={styles.alunoNome}>{item.nomeAluno}</Text>
+                  <Text style={styles.provaNome}>Prova: {item.nomeProva}</Text>
                   <Text style={styles.imagemData}>
                     Capturada em: {item.dataCriacao}
                   </Text>
@@ -403,6 +424,18 @@ const styles = StyleSheet.create({
   imagemInfo: {
     flex: 1,
     marginLeft: 15,
+  },
+  alunoNome: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    color: '#2F4FCD',
+    marginBottom: 2,
+  },
+  provaNome: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#666',
+    marginBottom: 2,
   },
   imagemData: {
     fontSize: 14,

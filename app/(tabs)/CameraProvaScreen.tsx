@@ -1,4 +1,3 @@
-// app/camera-prova.tsx
 import React, { useRef, useState, useEffect } from 'react';
 import { 
   StyleSheet, 
@@ -10,7 +9,10 @@ import {
   Alert,
   SafeAreaView,
   Pressable,
-  Platform
+  Platform,
+  TextInput,
+  ScrollView,
+  Dimensions
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
@@ -22,6 +24,10 @@ import {
 } from 'expo-camera';
 import { useLocalSearchParams, useRouter, Link } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Picker } from '@react-native-picker/picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface Prova {
   id: string;
@@ -34,7 +40,10 @@ interface Prova {
 interface ImagemCapturada {
   id: string;
   provaId: string;
+  nomeAluno: string;
+  nomeProva: string;
   imageUri: string;
+  imageCroppedUri?: string; // Imagem recortada
   dataCriacao: string;
   status: 'pendente' | 'em_analise' | 'corrigido';
   resultado?: {
@@ -50,32 +59,64 @@ const IMAGENS_STORAGE_KEY = '@GabaritoApp:imagens';
 export default function CameraProvaScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [croppedImage, setCroppedImage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [facing, setFacing] = useState<CameraType>('back');
-  const [prova, setProva] = useState<Prova | null>(null);
+  const [provas, setProvas] = useState<Prova[]>([]);
+  const [selectedProvaId, setSelectedProvaId] = useState<string>('');
+  const [nomeAluno, setNomeAluno] = useState('');
+  const [showCamera, setShowCamera] = useState(false);
+  const [flashMode, setFlashMode] = useState('off');
+  
+  // Configuração da área de sangria/recorte
+  // Essas proporções são baseadas no exemplo do gabarito mostrado
+  const [frameRatio, setFrameRatio] = useState({
+    widthRatio: 0.7,  // Porcentagem da largura da tela para o frame
+    heightRatio: 0.4, // Proporção baseada na área apenas do gabarito, não da folha toda
+    aspectRatio: 1,   // Inicia com proporção 1:1 (quadrado)
+  });
   
   const cameraRef = useRef<CameraView>(null);
   const router = useRouter();
-  const { provaId } = useLocalSearchParams();
+
+  // Cálculo das dimensões do frame baseado na proporção desejada
+  const frameWidth = SCREEN_WIDTH * frameRatio.widthRatio;
+  const frameHeight = frameWidth * frameRatio.heightRatio;
 
   useEffect(() => {
-    carregarProva();
+    carregarProvas();
   }, []);
 
-  const carregarProva = async () => {
+  const carregarProvas = async () => {
     try {
       const provasArmazenadas = await AsyncStorage.getItem(PROVAS_STORAGE_KEY);
       if (provasArmazenadas) {
-        const provas: Prova[] = JSON.parse(provasArmazenadas);
-        const provaAtual = provas.find(p => p.id === provaId);
-        if (provaAtual) {
-          setProva(provaAtual);
+        const provasData: Prova[] = JSON.parse(provasArmazenadas);
+        // Filtrar apenas provas que têm gabarito
+        const provasComGabarito = provasData.filter(p => p.gabarito && p.gabarito.length > 0);
+        setProvas(provasComGabarito);
+        
+        if (provasComGabarito.length > 0) {
+          setSelectedProvaId(provasComGabarito[0].id);
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar prova:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os dados da prova');
+      console.error('Erro ao carregar provas:', error);
+      Alert.alert('Erro', 'Não foi possível carregar as provas');
     }
+  };
+
+  const iniciarCaptura = () => {
+    if (!selectedProvaId) {
+      Alert.alert('Erro', 'Selecione uma prova/gabarito');
+      return;
+    }
+    if (!nomeAluno.trim()) {
+      Alert.alert('Erro', 'Digite o nome do aluno');
+      return;
+    }
+    setShowCamera(true);
   };
   
   // Verificação de permissão
@@ -101,6 +142,65 @@ export default function CameraProvaScreen() {
     );
   }
 
+  // Função para recortar especificamente a área do gabarito (sangria)
+  const cropGabaritoArea = async (imageUri: string) => {
+    try {
+      setIsProcessing(true);
+      
+      // Obtém as dimensões da imagem capturada
+      const { width: photoWidth, height: photoHeight } = await new Promise((resolve) => {
+        Image.getSize(imageUri, (width, height) => {
+          resolve({ width, height });
+        });
+      });
+      
+      // Calcula as dimensões do frame de recorte em relação à imagem capturada
+      const viewRatio = photoWidth / SCREEN_WIDTH;
+      
+      // Calcula o centro da imagem
+      const centerX = photoWidth / 2;
+      const centerY = photoHeight / 2;
+      
+      // Calcula as dimensões do recorte baseadas na proporção do frame
+      const cropWidth = frameWidth * viewRatio;
+      const cropHeight = frameHeight * viewRatio;
+      
+      // Calcula as coordenadas de origem do recorte, centralizando na imagem
+      const originX = Math.max(0, centerX - (cropWidth / 2));
+      const originY = Math.max(0, centerY - (cropHeight / 2));
+      
+      console.log('Dimensões da imagem:', photoWidth, photoHeight);
+      console.log('Dimensões do recorte:', cropWidth, cropHeight);
+      console.log('Origem do recorte:', originX, originY);
+      
+      // Realiza o recorte com valores arredondados para evitar erros
+      const cropResult = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [
+          {
+            crop: {
+              originX: Math.round(originX),
+              originY: Math.round(originY),
+              width: Math.round(Math.min(cropWidth, photoWidth - originX)),
+              height: Math.round(Math.min(cropHeight, photoHeight - originY))
+            }
+          }
+        ],
+        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      
+      console.log('Imagem recortada:', cropResult.uri);
+      setCroppedImage(cropResult.uri);
+      return cropResult.uri;
+    } catch (error) {
+      console.error('Erro ao recortar imagem:', error);
+      Alert.alert('Erro', 'Não foi possível processar a imagem. Tente novamente.');
+      return null;
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const captureImage = async () => {
     if (!cameraRef.current) {
       console.log('Camera ref não disponível');
@@ -117,6 +217,9 @@ export default function CameraProvaScreen() {
       if (photo && photo.uri) {
         console.log('Foto capturada:', photo.uri);
         setCapturedImage(photo.uri);
+        
+        // Inicia o processamento da imagem automaticamente
+        cropGabaritoArea(photo.uri);
       } else {
         throw new Error('Foto não capturada corretamente');
       }
@@ -124,6 +227,10 @@ export default function CameraProvaScreen() {
       console.error('Erro ao capturar imagem:', error);
       Alert.alert('Erro', 'Não foi possível capturar a imagem.');
     }
+  };
+
+  const toggleFlash = () => {
+    setFlashMode(prev => prev === 'off' ? 'on' : 'off');
   };
 
   const toggleFacing = () => {
@@ -136,14 +243,28 @@ export default function CameraProvaScreen() {
       return;
     }
     
+    if (!croppedImage) {
+      Alert.alert('Erro', 'A imagem ainda está sendo processada');
+      return;
+    }
+    
     try {
       setIsSaving(true);
       
+      // Encontrar a prova selecionada
+      const provaSelecionada = provas.find(p => p.id === selectedProvaId);
+      if (!provaSelecionada) {
+        throw new Error('Prova não encontrada');
+      }
+
       // Criar objeto da imagem capturada
       const novaImagem: ImagemCapturada = {
         id: Date.now().toString(),
-        provaId: provaId as string,
+        provaId: selectedProvaId,
+        nomeAluno: nomeAluno.trim(),
+        nomeProva: provaSelecionada.nome,
         imageUri: capturedImage,
+        imageCroppedUri: croppedImage,
         dataCriacao: new Date().toLocaleDateString('pt-BR'),
         status: 'pendente'
       };
@@ -163,9 +284,9 @@ export default function CameraProvaScreen() {
       // Atualizar a prova com a referência da nova foto
       const provasArmazenadas = await AsyncStorage.getItem(PROVAS_STORAGE_KEY);
       if (provasArmazenadas) {
-        const provas: Prova[] = JSON.parse(provasArmazenadas);
-        const provasAtualizadas = provas.map(p => {
-          if (p.id === provaId) {
+        const provasData: Prova[] = JSON.parse(provasArmazenadas);
+        const provasAtualizadas = provasData.map(p => {
+          if (p.id === selectedProvaId) {
             return {
               ...p,
               fotos: [...(p.fotos || []), novaImagem.id]
@@ -189,6 +310,72 @@ export default function CameraProvaScreen() {
     }
   };
 
+  const renderFormulario = () => {
+    return (
+      <ScrollView contentContainerStyle={styles.formContainer}>
+        <View style={styles.formHeader}>
+          <Text style={styles.formTitle}>Nova Captura</Text>
+          <Text style={styles.formSubtitle}>Preencha os dados antes de tirar a foto</Text>
+        </View>
+
+        <View style={styles.formCard}>
+          <Text style={styles.formLabel}>Selecione a Prova/Gabarito</Text>
+          {provas.length > 0 ? (
+            <View style={styles.pickerWrapper}>
+              <Picker
+                selectedValue={selectedProvaId}
+                onValueChange={(itemValue) => setSelectedProvaId(itemValue)}
+                style={styles.picker}
+                dropdownIconColor="#2F4FCD"
+              >
+                {provas.map((prova) => (
+                  <Picker.Item 
+                    key={prova.id} 
+                    label={prova.nome} 
+                    value={prova.id} 
+                  />
+                ))}
+              </Picker>
+            </View>
+          ) : (
+            <View style={styles.emptyProvasContainer}>
+              <Text style={styles.emptyProvasText}>
+                Nenhuma prova com gabarito encontrada
+              </Text>
+              <TouchableOpacity
+                style={styles.createProvaButton}
+                onPress={() => router.push('/criar-editar-prova')}
+              >
+                <Text style={styles.createProvaButtonText}>Criar Prova</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <Text style={styles.formLabel}>Nome do Aluno</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Digite o nome do aluno"
+            placeholderTextColor="#999"
+            value={nomeAluno}
+            onChangeText={setNomeAluno}
+          />
+
+          <TouchableOpacity
+            style={[
+              styles.startButton, 
+              (!selectedProvaId || !nomeAluno.trim()) && styles.startButtonDisabled
+            ]}
+            onPress={iniciarCaptura}
+            disabled={!selectedProvaId || !nomeAluno.trim()}
+          >
+            <Feather name="camera" size={20} color="#FFF" />
+            <Text style={styles.startButtonText}>Iniciar Captura</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  };
+
   const renderPreview = () => {
     if (!capturedImage) {
       return null;
@@ -196,29 +383,55 @@ export default function CameraProvaScreen() {
 
     return (
       <View style={styles.previewContainer}>
-        <Image 
-          source={{ uri: capturedImage }} 
-          style={styles.previewImage}
-          resizeMode="contain"
-        />
+        {/* Exibe imagem original e recortada */}
+        <View style={styles.previewImages}>
+          <View style={styles.previewImageContainer}>
+            <Text style={styles.previewLabel}>Imagem Original</Text>
+            <Image 
+              source={{ uri: capturedImage }} 
+              style={styles.previewImageSplit}
+              resizeMode="contain"
+            />
+          </View>
+          
+          {croppedImage ? (
+            <View style={styles.previewImageContainer}>
+              <Text style={styles.previewLabel}>Área do Gabarito</Text>
+              <Image 
+                source={{ uri: croppedImage }} 
+                style={styles.previewImageSplit}
+                resizeMode="contain"
+              />
+            </View>
+          ) : (
+            <View style={styles.previewImageContainer}>
+              <Text style={styles.previewLabel}>Processando...</Text>
+              <ActivityIndicator size="large" color="#2F4FCD" />
+            </View>
+          )}
+        </View>
         
         <View style={styles.previewActions}>
           <TouchableOpacity 
             style={[styles.previewButton, styles.cancelButton]}
-            onPress={() => setCapturedImage(null)}
-            disabled={isSaving}
+            onPress={() => {
+              setCapturedImage(null);
+              setCroppedImage(null);
+            }}
+            disabled={isSaving || isProcessing}
           >
             <Feather name="refresh-ccw" size={20} color="#FF6B6B" />
             <Text style={styles.cancelText}>Capturar novamente</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.previewButton, styles.saveButton]}
-            onPress={() => {
-              console.log('Botão salvar pressionado');
-              salvarImagem();
-            }}
-            disabled={isSaving}
+            style={[
+              styles.previewButton, 
+              styles.saveButton,
+              (isSaving || isProcessing || !croppedImage) && styles.saveButtonDisabled
+            ]}
+            onPress={salvarImagem}
+            disabled={isSaving || isProcessing || !croppedImage}
           >
             {isSaving ? (
               <ActivityIndicator size="small" color="#FFF" />
@@ -241,51 +454,97 @@ export default function CameraProvaScreen() {
           style={styles.camera}
           ref={cameraRef}
           facing={facing}
+          flash={flashMode}
           mode="picture"
-          mute={true}
           enableZoomGesture
-          responsiveOrientationWhenOrientationLocked
         >
+          <TouchableOpacity 
+            style={styles.closeButton}
+            onPress={() => setShowCamera(false)}
+          >
+            <Feather name="x" size={28} color="white" />
+          </TouchableOpacity>
+          
           <View style={styles.overlayContainer}>
-            <View style={styles.frameGuide}>
+            {/* Moldura de guia otimizada para a área do gabarito */}
+            <View style={[
+              styles.frameGuide, 
+              { 
+                width: frameWidth, 
+                height: frameHeight,
+                // Posiciona o frame um pouco mais para baixo para acomodar o gabarito
+                top: 40 
+              }
+            ]}>
+              {/* Cantos da moldura */}
               <View style={styles.cornerTL} />
               <View style={styles.cornerTR} />
               <View style={styles.cornerBL} />
               <View style={styles.cornerBR} />
+              
+              {/* Linhas internas de guia para alinhar com o gabarito */}
+              <View style={styles.gridLineHorizontal} />
+              <View style={styles.gridLineVertical} />
             </View>
+            
             <Text style={styles.guideText}>
-              Posicione a prova dentro da moldura
+              Alinhe APENAS A GRADE do gabarito na moldura
             </Text>
           </View>
           
-          <View style={styles.shutterContainer}>
-            <Pressable onPress={() => router.back()}>
-              <Feather name="x" size={32} color="white" />
-            </Pressable>
+          <View style={styles.cameraControls}>
+            <TouchableOpacity 
+              style={styles.cameraControlButton} 
+              onPress={toggleFacing}
+            >
+              <Feather name="refresh-cw" size={24} color="white" />
+            </TouchableOpacity>
             
-            <Pressable onPress={captureImage}>
-              {({ pressed }) => (
-                <View
-                  style={[
-                    styles.shutterBtn,
-                    {
-                      opacity: pressed ? 0.7 : 1,
-                    },
-                  ]}
-                >
-                  <View style={styles.shutterBtnInner} />
-                </View>
-              )}
-            </Pressable>
+            <TouchableOpacity 
+              style={styles.shutterButton}
+              onPress={captureImage}
+            >
+              <View style={styles.shutterButtonInner} />
+            </TouchableOpacity>
             
-            <Pressable onPress={toggleFacing}>
-              <Feather name="refresh-cw" size={32} color="white" />
-            </Pressable>
+            <TouchableOpacity 
+              style={styles.cameraControlButton} 
+              onPress={toggleFlash}
+            >
+              <Feather 
+                name={flashMode === 'off' ? "zap-off" : "zap"} 
+                size={24} 
+                color="white" 
+              />
+            </TouchableOpacity>
+          </View>
+          
+          {/* Dicas para melhorar a captura */}
+          <View style={styles.tipContainer}>
+            <Text style={styles.tipText}>
+              Dica: Capture apenas a grade de múltipla escolha com as marcações
+            </Text>
           </View>
         </CameraView>
       </>
     );
   };
+
+  if (!showCamera) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="dark" />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Feather name="arrow-left" size={24} color="#2F4FCD" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Capturar Prova</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        {renderFormulario()}
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -298,7 +557,114 @@ export default function CameraProvaScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#FFFFFF',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: Platform.OS === 'ios' ? 10 : 20,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontFamily: 'Poppins-Bold',
+    color: '#2F4FCD',
+  },
+  formContainer: {
+    padding: 20,
+  },
+  formHeader: {
+    marginBottom: 30,
+  },
+  formTitle: {
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    color: '#2F4FCD',
+    marginBottom: 8,
+  },
+  formSubtitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#666',
+  },
+  formCard: {
+    backgroundColor: '#DDDBFF',
+    borderRadius: 16,
+    padding: 20,
+    // Estilo neomorphism
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: -4, height: -4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  formLabel: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    color: '#2F4FCD',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  pickerWrapper: {
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 50,
+    color: '#2F4FCD',
+  },
+  input: {
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    color: '#333',
+  },
+  emptyProvasContainer: {
+    padding: 20,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  emptyProvasText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#666',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  createProvaButton: {
+    backgroundColor: '#2F4FCD',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  createProvaButtonText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+  },
+  startButton: {
+    backgroundColor: '#2F4FCD',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 24,
+  },
+  startButtonDisabled: {
+    backgroundColor: '#BBBADD',
+  },
+  startButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    marginLeft: 8,
   },
   centerContainer: {
     flex: 1,
@@ -340,8 +706,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   frameGuide: {
-    width: '80%',
-    height: '60%',
     borderColor: 'rgba(255, 255, 255, 0.7)',
     borderWidth: 1,
     position: 'relative',
@@ -350,8 +714,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -2,
     left: -2,
-    height: 20,
-    width: 20,
+    height: 25,
+    width: 25,
     borderTopWidth: 4,
     borderLeftWidth: 4,
     borderColor: '#2F4FCD',
@@ -360,8 +724,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -2,
     right: -2,
-    height: 20,
-    width: 20,
+    height: 25,
+    width: 25,
     borderTopWidth: 4,
     borderRightWidth: 4,
     borderColor: '#2F4FCD',
@@ -370,8 +734,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -2,
     left: -2,
-    height: 20,
-    width: 20,
+    height: 25,
+    width: 25,
     borderBottomWidth: 4,
     borderLeftWidth: 4,
     borderColor: '#2F4FCD',
@@ -380,11 +744,26 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -2,
     right: -2,
-    height: 20,
-    width: 20,
+    height: 25,
+    width: 25,
     borderBottomWidth: 4,
     borderRightWidth: 4,
     borderColor: '#2F4FCD',
+  },
+  // Linhas de grade para ajudar no alinhamento
+  gridLineHorizontal: {
+    position: 'absolute',
+    width: '100%',
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    top: '50%',
+  },
+  gridLineVertical: {
+    position: 'absolute',
+    height: '100%',
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    left: '50%',
   },
   guideText: {
     color: '#FFF',
@@ -425,6 +804,30 @@ const styles = StyleSheet.create({
   previewContainer: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  previewImages: {
+    flex: 1,
+    flexDirection: 'column',
+  },
+  previewImageContainer: {
+    flex: 1,
+    margin: 5,
+    backgroundColor: '#111',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  previewLabel: {
+    color: '#FFF',
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    padding: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    textAlign: 'center',
+  },
+  previewImageSplit: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
   previewImage: {
     flex: 1,

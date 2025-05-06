@@ -327,7 +327,6 @@ export default function ScanScreen() {
           mode="picture"
           facing={facing}
           mute={true}
-          enableZoomGesture
           responsiveOrientationWhenOrientationLocked
         >
           <View style={styles.cameraHeader}>

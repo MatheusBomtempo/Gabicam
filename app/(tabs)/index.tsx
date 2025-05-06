@@ -94,6 +94,27 @@ export default function Home() {
             <Text style={styles.buttonTextSecondary}>CRIAR/EDITAR PROVA</Text>
           </View>
         </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.buttonSecondary}
+          onPress={() => router.push('/TesteScreen')}
+        >
+          <View style={styles.buttonInner}>
+            <Feather name="edit" size={20} color="#2F4FCD" />
+            <Text style={styles.buttonTextSecondary}>TESTE API</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.buttonSecondary}
+          onPress={() => router.push('/ConfiguracoesScreen')}
+        >
+          <View style={styles.buttonInner}>
+            <Feather name="edit" size={20} color="#2F4FCD" />
+            <Text style={styles.buttonTextSecondary}>Apagar tudo</Text>
+          </View>
+        </TouchableOpacity>
+
       </View>
     </SafeAreaView>
   );
