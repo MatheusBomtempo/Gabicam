@@ -27,6 +27,8 @@ import { useLocalSearchParams, useRouter, Link } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -56,6 +58,8 @@ interface ImagemCapturada {
 
 const PROVAS_STORAGE_KEY = '@GabaritoApp:provas';
 const IMAGENS_STORAGE_KEY = '@GabaritoApp:imagens';
+// Diretório para salvar as imagens normalizadas
+const NORMALIZED_IMAGES_DIR = `${FileSystem.cacheDirectory}normalized_images/`;
 
 export default function CameraProvaScreen() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -69,6 +73,7 @@ export default function CameraProvaScreen() {
   const [nomeAluno, setNomeAluno] = useState('');
   const [showCamera, setShowCamera] = useState(false);
   const [flashMode, setFlashMode] = useState('off');
+  const [imageSource, setImageSource] = useState<'camera' | 'gallery' | null>(null);
   
   const cameraRef = useRef<CameraView>(null);
   const router = useRouter();
@@ -79,6 +84,21 @@ export default function CameraProvaScreen() {
 
   useEffect(() => {
     carregarProvas();
+    
+    // Criar diretório para imagens normalizadas se não existir
+    const setupDirectory = async () => {
+      try {
+        const dirInfo = await FileSystem.getInfoAsync(NORMALIZED_IMAGES_DIR);
+        if (!dirInfo.exists) {
+          await FileSystem.makeDirectoryAsync(NORMALIZED_IMAGES_DIR, { intermediates: true });
+          console.log("Diretório de imagens normalizadas criado");
+        }
+      } catch (err) {
+        console.error("Erro ao criar diretório:", err);
+      }
+    };
+    
+    setupDirectory();
   }, []);
 
   const carregarProvas = async () => {
@@ -112,6 +132,62 @@ export default function CameraProvaScreen() {
     setShowCamera(true);
   };
   
+  // Função para selecionar imagem da galeria
+// Função para selecionar imagem da galeria
+// Função para selecionar imagem da galeria
+const selecionarDaGaleria = async () => {
+  if (!selectedProvaId) {
+    Alert.alert('Erro', 'Selecione uma prova/gabarito');
+    return;
+  }
+  if (!nomeAluno.trim()) {
+    Alert.alert('Erro', 'Digite o nome do aluno');
+    return;
+  }
+
+  try {
+    // Solicitar permissão para acessar a galeria
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permissão negada', 'Precisamos de permissão para acessar sua galeria de fotos');
+      return;
+    }
+    
+    // Lançar ImagePicker para selecionar da galeria
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 1,
+      aspect: [4, 5], // Proporção aproximada de um gabarito
+    });
+    
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      
+      setIsProcessing(true);
+      setImageSource('gallery');
+      setCapturedImage(uri);
+      
+      try {
+        // Apenas converter para JPG com nome padronizado
+        const processedImage = await normalizeImage(uri);
+        console.log("Imagem normalizada para JPG:", processedImage);
+        setCroppedImage(processedImage);
+      } catch (processError) {
+        console.error("Erro ao normalizar imagem:", processError);
+        setCroppedImage(uri);
+        Alert.alert('Erro', 'Não foi possível normalizar a imagem.');
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao selecionar imagem da galeria:', error);
+    Alert.alert('Erro', 'Não foi possível selecionar a imagem da galeria.');
+    setIsProcessing(false);
+  }
+};
+  
   // Verificação de permissão
   if (!permission) {
     return (
@@ -135,21 +211,54 @@ export default function CameraProvaScreen() {
     );
   }
 
+  // Função para normalizar a imagem para um formato padronizado
+  // Função simplificada para normalizar a imagem para JPG e padronizar o nome
+const normalizeImage = async (imageUri: string): Promise<string> => {
+  try {
+    // Criar um nome padronizado para o arquivo
+    const normalizedFilename = `PROVA-OCR.jpg`;
+    const normalizedFilePath = `${NORMALIZED_IMAGES_DIR}${normalizedFilename}`;
+    
+    // Converter para JPG com qualidade 100% sem qualquer outro processamento
+    const convertedImage = await ImageManipulator.manipulateAsync(
+      imageUri,
+      [], // Sem operações de transformação
+      { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    
+    console.log("Imagem convertida para JPG:", convertedImage.uri);
+    
+    // Salvar com nome padronizado
+    await FileSystem.moveAsync({
+      from: convertedImage.uri,
+      to: normalizedFilePath
+    });
+    
+    return normalizedFilePath;
+  } catch (error) {
+    console.error("Erro ao normalizar imagem:", error);
+    // Em caso de erro, retorna a imagem original
+    return imageUri;
+  }
+};
+
   // Função para recortar apenas a área do gabarito
   const cropGabaritoArea = async (imageUri: string) => {
     try {
       setIsProcessing(true);
       
-      // Obtém as dimensões da imagem capturada
+      // Primeiro normalize a imagem
+      const normalizedUri = await normalizeImage(imageUri);
+      console.log('Imagem normalizada para processamento:', normalizedUri);
+      
+      // Obtém as dimensões da imagem
       const { width: photoWidth, height: photoHeight } = await new Promise((resolve) => {
-        Image.getSize(imageUri, (width, height) => {
+        Image.getSize(normalizedUri, (width, height) => {
           resolve({ width, height });
         });
       });
       
       // Calcula as coordenadas para o recorte centralizado na imagem
-      // Temos que mapear as coordenadas da view para as coordenadas reais da imagem
-      // Aproximadamente, assumindo que a câmera está centralizada
       const viewWidth = SCREEN_WIDTH;
       const centerX = photoWidth / 2;
       const centerY = photoHeight / 2;
@@ -168,7 +277,7 @@ export default function CameraProvaScreen() {
       
       // Aplica o recorte
       const manipResult = await ImageManipulator.manipulateAsync(
-        imageUri,
+        normalizedUri,
         [
           {
             crop: {
@@ -182,7 +291,7 @@ export default function CameraProvaScreen() {
         { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
       );
       
-      // Simplificando - apenas usando as operações básicas suportadas
+      // Aprimoramentos adicionais para melhorar a qualidade
       const enhancedResult = await ImageManipulator.manipulateAsync(
         manipResult.uri,
         [],  // Sem operações adicionais
@@ -190,7 +299,6 @@ export default function CameraProvaScreen() {
       );
       
       console.log('Imagem recortada e melhorada:', enhancedResult.uri);
-      setCroppedImage(enhancedResult.uri);
       return enhancedResult.uri;
     } catch (error) {
       console.error('Erro ao recortar imagem:', error);
@@ -216,6 +324,7 @@ export default function CameraProvaScreen() {
       
       if (photo && photo.uri) {
         console.log('Foto capturada:', photo.uri);
+        setImageSource('camera');
         setCapturedImage(photo.uri);
         
         // Inicia o processamento da imagem automaticamente
@@ -255,13 +364,19 @@ export default function CameraProvaScreen() {
         throw new Error('Prova não encontrada');
       }
 
+      // Normalizar a imagem final antes de salvar (caso ainda não tenha sido normalizada)
+      let finalImage = capturedImage;
+      if (!finalImage.includes(NORMALIZED_IMAGES_DIR)) {
+        finalImage = await normalizeImage(capturedImage);
+      }
+
       // Criar objeto da imagem capturada
       const novaImagem: ImagemCapturada = {
         id: Date.now().toString(),
         provaId: selectedProvaId,
         nomeAluno: nomeAluno.trim(),
         nomeProva: provaSelecionada.nome,
-        imageUri: capturedImage,
+        imageUri: finalImage, // Usa a imagem normalizada
         imageCroppedUri: croppedImage || undefined, // Inclui a versão recortada
         dataCriacao: new Date().toLocaleDateString('pt-BR'),
         status: 'pendente'
@@ -342,7 +457,7 @@ export default function CameraProvaScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.createProvaButton}
-                onPress={() => router.push('/criar-editar-prova')}
+                onPress={() => router.push('/CriarEditarProvaScreen')}
               >
                 <Text style={styles.createProvaButtonText}>Criar Prova</Text>
               </TouchableOpacity>
@@ -358,83 +473,137 @@ export default function CameraProvaScreen() {
             onChangeText={setNomeAluno}
           />
 
-          <TouchableOpacity
-            style={[
-              styles.startButton, 
-              (!selectedProvaId || !nomeAluno.trim()) && styles.startButtonDisabled
-            ]}
-            onPress={iniciarCaptura}
-            disabled={!selectedProvaId || !nomeAluno.trim()}
-          >
-            <Feather name="camera" size={20} color="#FFF" />
-            <Text style={styles.startButtonText}>Iniciar Captura</Text>
-          </TouchableOpacity>
+          <View style={styles.captureOptions}>
+            <TouchableOpacity
+              style={[
+                styles.captureButton, 
+                (!selectedProvaId || !nomeAluno.trim()) && styles.captureButtonDisabled
+              ]}
+              onPress={iniciarCaptura}
+              disabled={!selectedProvaId || !nomeAluno.trim()}
+            >
+              <Feather name="camera" size={20} color="#FFF" />
+              <Text style={styles.captureButtonText}>Usar Câmera</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.captureButton, 
+                styles.galleryButton,
+                (!selectedProvaId || !nomeAluno.trim()) && styles.captureButtonDisabled
+              ]}
+              onPress={selecionarDaGaleria}
+              disabled={!selectedProvaId || !nomeAluno.trim()}
+            >
+              <Feather name="image" size={20} color="#FFF" />
+              <Text style={styles.captureButtonText}>Selecionar da Galeria</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     );
   };
 
-  const renderPreview = () => {
-    if (!capturedImage) {
-      return null;
-    }
+// Modificação no renderPreview para imagens da galeria
+const renderPreview = () => {
+  if (!capturedImage) {
+    return null;
+  }
 
-    return (
-      <View style={styles.previewContainer}>
-        {/* Mostra tanto a imagem original quanto a recortada */}
-        <View style={styles.previewImages}>
-          <View style={styles.previewImageContainer}>
-            <Text style={styles.previewLabel}>Imagem Original</Text>
-            <Image 
-              source={{ uri: capturedImage }} 
-              style={styles.previewImageSplit}
-              resizeMode="contain"
-            />
-          </View>
-          
-          {croppedImage && (
+  return (
+    <View style={styles.previewContainer}>
+      {/* Para imagens da câmera, mostra original e recortada; para galeria, mostra apenas a normalizada */}
+      <View style={styles.previewImages}>
+        {imageSource === 'camera' ? (
+          // Exibição para imagens da câmera (imagem original + recortada)
+          <>
             <View style={styles.previewImageContainer}>
-              <Text style={styles.previewLabel}>Área Recortada</Text>
+              <Text style={styles.previewLabel}>Imagem Capturada</Text>
               <Image 
-                source={{ uri: croppedImage }} 
+                source={{ uri: capturedImage }} 
                 style={styles.previewImageSplit}
                 resizeMode="contain"
               />
             </View>
-          )}
-        </View>
-        
-        <View style={styles.previewActions}>
-          <TouchableOpacity 
-            style={[styles.previewButton, styles.cancelButton]}
-            onPress={() => {
-              setCapturedImage(null);
-              setCroppedImage(null);
-            }}
-            disabled={isSaving}
-          >
-            <Feather name="refresh-ccw" size={20} color="#FF6B6B" />
-            <Text style={styles.cancelText}>Capturar novamente</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.previewButton, styles.saveButton]}
-            onPress={salvarImagem}
-            disabled={isSaving || isProcessing}
-          >
-            {isSaving || isProcessing ? (
-              <ActivityIndicator size="small" color="#FFF" />
+            
+            {croppedImage ? (
+              <View style={styles.previewImageContainer}>
+                <Text style={styles.previewLabel}>Área Processada</Text>
+                <Image 
+                  source={{ uri: croppedImage }} 
+                  style={styles.previewImageSplit}
+                  resizeMode="contain"
+                />
+              </View>
             ) : (
-              <>
-                <Feather name="check" size={20} color="#FFF" />
-                <Text style={styles.saveText}>Salvar</Text>
-              </>
+              <View style={styles.previewImageContainer}>
+                <Text style={styles.previewLabel}>Processando...</Text>
+                <ActivityIndicator size="large" color="#2F4FCD" />
+              </View>
             )}
-          </TouchableOpacity>
-        </View>
+          </>
+        ) : (
+          // Exibição para imagens da galeria (apenas a imagem normalizada)
+          <View style={[styles.previewImageContainer, {flex: 1}]}>
+            <Text style={styles.previewLabel}>Imagem Selecionada</Text>
+            <Image 
+              source={{ uri: croppedImage || capturedImage }} 
+              style={styles.previewImage}
+              resizeMode="contain"
+            />
+            {!croppedImage && (
+              <View style={styles.processingOverlay}>
+                <ActivityIndicator size="large" color="#2F4FCD" />
+                <Text style={styles.processingText}>Processando imagem...</Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
-    );
-  };
+      
+      <View style={styles.previewActions}>
+        <TouchableOpacity 
+          style={[styles.previewButton, styles.cancelButton]}
+          onPress={() => {
+            setCapturedImage(null);
+            setCroppedImage(null);
+            setImageSource(null);
+            
+            // Se veio da galeria, volta para o formulário, se veio da câmera, volta para a câmera
+            if (imageSource === 'gallery') {
+              setShowCamera(false);
+            }
+          }}
+          disabled={isSaving || isProcessing}
+        >
+          <Feather name="refresh-ccw" size={20} color="#FF6B6B" />
+          <Text style={styles.cancelText}>
+            {imageSource === 'camera' ? 'Capturar novamente' : 'Selecionar outra'}
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[
+            styles.previewButton, 
+            styles.saveButton,
+            (isSaving || isProcessing || !croppedImage) && styles.saveButtonDisabled
+          ]}
+          onPress={salvarImagem}
+          disabled={isSaving || isProcessing || !croppedImage}
+        >
+          {isSaving || isProcessing ? (
+            <ActivityIndicator size="small" color="#FFF" />
+          ) : (
+            <>
+              <Feather name="check" size={20} color="#FFF" />
+              <Text style={styles.saveText}>Salvar</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
 
   const renderCamera = () => {
     return (
@@ -449,6 +618,24 @@ export default function CameraProvaScreen() {
           flash={flashMode}
           responsiveOrientationWhenOrientationLocked
         >
+          <View style={styles.cameraHeader}>
+            <TouchableOpacity onPress={() => setShowCamera(false)}>
+              <Feather name="arrow-left" size={28} color="white" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity onPress={toggleFacing}>
+              <Feather name="refresh-cw" size={24} color="white" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity onPress={toggleFlash}>
+              <Feather 
+                name={flashMode === 'off' ? "zap-off" : "zap"} 
+                size={24} 
+                color="white" 
+              />
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.overlayContainer}>
             {/* Moldura melhorada com proporção mais adequada para o gabarito */}
             <View style={[
@@ -473,39 +660,28 @@ export default function CameraProvaScreen() {
           </View>
           
           <View style={styles.shutterContainer}>
-            <Pressable onPress={() => setShowCamera(false)}>
-              <Feather name="x" size={32} color="white" />
-            </Pressable>
+            <TouchableOpacity 
+              style={styles.galleryOption}
+              onPress={selecionarDaGaleria}
+            >
+              <Feather name="image" size={28} color="white" />
+            </TouchableOpacity>
             
-            <Pressable onPress={captureImage}>
-              {({ pressed }) => (
-                <View
-                  style={[
-                    styles.shutterBtn,
-                    {
-                      opacity: pressed ? 0.7 : 1,
-                    },
-                  ]}
-                >
-                  <View style={styles.shutterBtnInner} />
-                </View>
-              )}
-            </Pressable>
+            <TouchableOpacity 
+              style={styles.shutterBtn}
+              onPress={captureImage}
+            >
+              <View style={styles.shutterBtnInner} />
+            </TouchableOpacity>
             
-            <Pressable onPress={toggleFlash}>
-              <Feather 
-                name={flashMode === 'off' ? "zap-off" : "zap"} 
-                size={32} 
-                color="white" 
-              />
-            </Pressable>
+            <View style={{ width: 40 }} /> {/* Espaço para balancear o layout */}
           </View>
         </CameraView>
       </>
     );
   };
 
-  if (!showCamera) {
+  if (!showCamera && !capturedImage) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" />
@@ -521,10 +697,19 @@ export default function CameraProvaScreen() {
     );
   }
 
+  if (capturedImage) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        {renderPreview()}
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
-      {capturedImage ? renderPreview() : renderCamera()}
+      {renderCamera()}
     </SafeAreaView>
   );
 }
@@ -623,19 +808,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Poppins-Medium',
   },
-  startButton: {
+  captureOptions: {
+    marginTop: 20,
+  },
+  captureButton: {
     backgroundColor: '#2F4FCD',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: 12,
-    marginTop: 24,
+    marginBottom: 12,
   },
-  startButtonDisabled: {
+  galleryButton: {
+    backgroundColor: '#27AE60',
+  },
+  captureButtonDisabled: {
     backgroundColor: '#BBBADD',
   },
-  startButtonText: {
+  captureButtonText: {
     color: '#FFF',
     fontSize: 16,
     fontFamily: 'Poppins-Bold',
@@ -658,196 +849,254 @@ const styles = StyleSheet.create({
   permissionButton: {
     backgroundColor: '#2F4FCD',
     paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-  },
-  permissionButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontFamily: 'Poppins-Bold',
-  },
-  camera: {
-    flex: 1,
-    width: '100%',
-  },
-  overlayContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  frameGuide: {
-    borderColor: 'rgba(255, 255, 255, 0.7)',
-    borderWidth: 1,
-    position: 'relative',
-  },
-  cornerTL: {
-    position: 'absolute',
-    top: -2,
-    left: -2,
-    height: 25,
-    width: 25,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-    borderColor: '#2F4FCD',
-  },
-  cornerTR: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    height: 25,
-    width: 25,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-    borderColor: '#2F4FCD',
-  },
-  cornerBL: {
-    position: 'absolute',
-    bottom: -2,
-    left: -2,
-    height: 25,
-    width: 25,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-    borderColor: '#2F4FCD',
-  },
-  cornerBR: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    height: 25,
-    width: 25,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-    borderColor: '#2F4FCD',
-  },
-  // Linhas de grade para ajudar no alinhamento
-  gridLineHorizontal: {
-    position: 'absolute',
-    width: '100%',
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    top: '50%',
-  },
-  gridLineVertical: {
-    position: 'absolute',
-    height: '100%',
-    width: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    left: '50%',
-  },
-  guideText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontFamily: 'Poppins-Medium',
-    textAlign: 'center',
-    marginTop: 20,
-    padding: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 10,
-  },
-  shutterContainer: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 50 : 30,
-    left: 0,
-    width: '100%',
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 30,
-  },
-  shutterBtn: {
-    backgroundColor: 'transparent',
-    borderWidth: 5,
-    borderColor: 'white',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shutterBtnInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#2F4FCD',
-  },
-  previewContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  previewImages: {
-    flex: 1,
-    flexDirection: 'column',
-  },
-  previewImageContainer: {
-    flex: 1,
-    margin: 5,
-    backgroundColor: '#111',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  previewLabel: {
-    color: '#FFF',
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    padding: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    textAlign: 'center',
-  },
-  previewImageSplit: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  previewImage: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  previewActions: {
-    flexDirection: 'row',
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 50 : 30,
-    left: 20,
-    right: 20,
-    justifyContent: 'space-between',
-  },
-  previewButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    flex: 0.48,
-    // Estilo neomorphism adaptado para fundo escuro
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  cancelButton: {
-    backgroundColor: '#FFFFFF',
-  },
-  cancelText: {
-    color: '#FF6B6B',
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    marginLeft: 5,
-  },
-  saveButton: {
-    backgroundColor: '#2F4FCD',
-  },
-  saveText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    marginLeft: 5,
-  },
+   paddingHorizontal: 24,
+   borderRadius: 10,
+ },
+ permissionButtonText: {
+   color: '#FFF',
+   fontSize: 16,
+   fontFamily: 'Poppins-Bold',
+ },
+ camera: {
+   flex: 1,
+   width: '100%',
+ },
+ cameraHeader: {
+   flexDirection: 'row',
+   justifyContent: 'space-between',
+   alignItems: 'center',
+   width: '100%',
+   paddingHorizontal: 20,
+   paddingTop: Platform.OS === 'ios' ? 50 : 30,
+   paddingBottom: 20,
+   position: 'absolute',
+   top: 0,
+   left: 0,
+   zIndex: 10,
+ },
+ overlayContainer: {
+   position: 'absolute',
+   top: 0,
+   left: 0,
+   right: 0,
+   bottom: 0,
+   justifyContent: 'center',
+   alignItems: 'center',
+   paddingHorizontal: 20,
+ },
+ frameGuide: {
+   borderColor: 'rgba(255, 255, 255, 0.7)',
+   borderWidth: 1,
+   position: 'relative',
+ },
+ cornerTL: {
+   position: 'absolute',
+   top: -2,
+   left: -2,
+   height: 25,
+   width: 25,
+   borderTopWidth: 4,
+   borderLeftWidth: 4,
+   borderColor: '#2F4FCD',
+ },
+ cornerTR: {
+   position: 'absolute',
+   top: -2,
+   right: -2,
+   height: 25,
+   width: 25,
+   borderTopWidth: 4,
+   borderRightWidth: 4,
+   borderColor: '#2F4FCD',
+ },
+ cornerBL: {
+   position: 'absolute',
+   bottom: -2,
+   left: -2,
+   height: 25,
+   width: 25,
+   borderBottomWidth: 4,
+   borderLeftWidth: 4,
+   borderColor: '#2F4FCD',
+ },
+ cornerBR: {
+   position: 'absolute',
+   bottom: -2,
+   right: -2,
+   height: 25,
+   width: 25,
+   borderBottomWidth: 4,
+   borderRightWidth: 4,
+   borderColor: '#2F4FCD',
+ },
+ // Linhas de grade para ajudar no alinhamento
+ gridLineHorizontal: {
+   position: 'absolute',
+   width: '100%',
+   height: 1,
+   backgroundColor: 'rgba(255, 255, 255, 0.4)',
+   top: '50%',
+ },
+ gridLineVertical: {
+   position: 'absolute',
+   height: '100%',
+   width: 1,
+   backgroundColor: 'rgba(255, 255, 255, 0.4)',
+   left: '50%',
+ },
+ guideText: {
+   color: '#FFF',
+   fontSize: 16,
+   fontFamily: 'Poppins-Medium',
+   textAlign: 'center',
+   marginTop: 20,
+   padding: 10,
+   backgroundColor: 'rgba(0, 0, 0, 0.5)',
+   borderRadius: 10,
+ },
+ shutterContainer: {
+   position: 'absolute',
+   bottom: Platform.OS === 'ios' ? 50 : 30,
+   left: 0,
+   width: '100%',
+   alignItems: 'center',
+   flexDirection: 'row',
+   justifyContent: 'space-around',
+   paddingHorizontal: 30,
+ },
+ galleryOption: {
+   width: 40,
+   height: 40,
+   borderRadius: 20,
+   backgroundColor: 'rgba(47, 79, 205, 0.7)',
+   justifyContent: 'center',
+   alignItems: 'center',
+ },
+ shutterBtn: {
+   backgroundColor: 'transparent',
+   borderWidth: 5,
+   borderColor: 'white',
+   width: 80,
+   height: 80,
+   borderRadius: 40,
+   alignItems: 'center',
+   justifyContent: 'center',
+ },
+ shutterBtnInner: {
+   width: 60,
+   height: 60,
+   borderRadius: 30,
+   backgroundColor: '#2F4FCD',
+ },
+ previewContainer: {
+   flex: 1,
+   backgroundColor: '#000',
+ },
+ previewImages: {
+   flex: 1,
+   flexDirection: 'column',
+ },
+ previewImageContainer: {
+   flex: 1,
+   margin: 5,
+   backgroundColor: '#111',
+   borderRadius: 8,
+   overflow: 'hidden',
+ },
+ previewLabel: {
+   color: '#FFF',
+   fontSize: 14,
+   fontFamily: 'Poppins-Medium',
+   padding: 8,
+   backgroundColor: 'rgba(0, 0, 0, 0.6)',
+   textAlign: 'center',
+ },
+ previewImageSplit: {
+   flex: 1,
+   width: '100%',
+   height: '100%',
+ },
+ previewImage: {
+   flex: 1,
+   width: '100%',
+   height: '100%',
+ },
+ previewActions: {
+   flexDirection: 'row',
+   position: 'absolute',
+   bottom: Platform.OS === 'ios' ? 50 : 30,
+   left: 20,
+   right: 20,
+   justifyContent: 'space-between',
+ },
+ previewButton: {
+   flexDirection: 'row',
+   alignItems: 'center',
+   justifyContent: 'center',
+   paddingVertical: 12,
+   paddingHorizontal: 20,
+   borderRadius: 12,
+   flex: 0.48,
+   // Estilo neomorphism adaptado para fundo escuro
+   shadowColor: '#000',
+   shadowOffset: { width: 2, height: 2 },
+   shadowOpacity: 0.3,
+   shadowRadius: 4,
+   elevation: 5,
+ },
+ cancelButton: {
+   backgroundColor: '#FFFFFF',
+ },
+ cancelText: {
+   color: '#FF6B6B',
+   fontSize: 14,
+   fontFamily: 'Poppins-Medium',
+   marginLeft: 5,
+ },
+ saveButton: {
+   backgroundColor: '#2F4FCD',
+ },
+ saveButtonDisabled: {
+   backgroundColor: 'rgba(47, 79, 205, 0.5)',
+ },
+ saveText: {
+   color: '#FFFFFF',
+   fontSize: 14,
+   fontFamily: 'Poppins-Medium',
+   marginLeft: 5,
+ },
+ startButton: {
+   backgroundColor: '#2F4FCD',
+   flexDirection: 'row',
+   alignItems: 'center',
+   justifyContent: 'center',
+   paddingVertical: 14,
+   borderRadius: 12,
+   marginTop: 24,
+ },
+ startButtonDisabled: {
+   backgroundColor: '#BBBADD',
+ },
+ startButtonText: {
+   color: '#FFF',
+   fontSize: 16,
+   fontFamily: 'Poppins-Bold',
+   marginLeft: 8,
+ },
+ processingOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+processingText: {
+  color: '#FFF',
+  fontSize: 16,
+  fontFamily: 'Poppins-Medium',
+  marginTop: 10,
+},
 });

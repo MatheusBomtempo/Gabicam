@@ -16,6 +16,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 interface Prova {
   id: string;
@@ -31,6 +32,7 @@ interface ImagemCapturada {
   nomeAluno: string;
   nomeProva: string;
   imageUri: string;
+  imageCroppedUri?: string; // Imagem recortada/processada
   dataCriacao: string;
   status: 'pendente' | 'em_analise' | 'corrigido';
   resultado?: {
@@ -43,6 +45,8 @@ interface ImagemCapturada {
 const PROVAS_STORAGE_KEY = '@GabaritoApp:provas';
 const IMAGENS_STORAGE_KEY = '@GabaritoApp:imagens';
 const API_URL = 'http://192.168.2.103:5000/corrigir';
+// Diretório para salvar as imagens normalizadas
+const NORMALIZED_IMAGES_DIR = `${FileSystem.cacheDirectory}normalized_images/`;
 
 export default function CorrecaoScreen() {
   const [imagens, setImagens] = useState<ImagemCapturada[]>([]);
@@ -51,6 +55,20 @@ export default function CorrecaoScreen() {
   const router = useRouter();
   
   useEffect(() => {
+    // Criar diretório para imagens normalizadas se não existir
+    const setupDirectory = async () => {
+      try {
+        const dirInfo = await FileSystem.getInfoAsync(NORMALIZED_IMAGES_DIR);
+        if (!dirInfo.exists) {
+          await FileSystem.makeDirectoryAsync(NORMALIZED_IMAGES_DIR, { intermediates: true });
+          console.log("Diretório de imagens normalizadas criado");
+        }
+      } catch (err) {
+        console.error("Erro ao criar diretório:", err);
+      }
+    };
+    
+    setupDirectory();
     carregarDados();
   }, []);
 
@@ -85,6 +103,36 @@ export default function CorrecaoScreen() {
     }
   };
 
+// Função para normalizar a imagem para um formato padronizado
+const normalizeImage = async (imageUri: string): Promise<string> => {
+  try {
+    // Criar um nome padronizado para o arquivo (sempre o mesmo nome)
+    const normalizedFilename = `PROVA-OCR.jpg`;
+    const normalizedFilePath = `${NORMALIZED_IMAGES_DIR}${normalizedFilename}`;
+    
+    // Converter para JPG com qualidade máxima
+    const convertedImage = await ImageManipulator.manipulateAsync(
+      imageUri,
+      [], // Sem operações de transformação adicionais
+      { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    
+    console.log("Imagem convertida para JPG:", convertedImage.uri);
+    
+    // Salvar com nome padronizado
+    await FileSystem.moveAsync({
+      from: convertedImage.uri,
+      to: normalizedFilePath
+    });
+    
+    return normalizedFilePath;
+  } catch (error) {
+    console.error("Erro ao normalizar imagem:", error);
+    // Em caso de erro, retorna a imagem original
+    return imageUri;
+  }
+};
+
   const iniciarCorrecao = async (item: ImagemCapturada) => {
     if (item.status === 'pendente') {
       try {
@@ -109,24 +157,29 @@ export default function CorrecaoScreen() {
           return;
         }
 
+        // Normalizar a imagem antes de enviar
+        const normalizedImageUri = await normalizeImage(item.imageUri);
+        
         // Preparar dados para API
         const formData = new FormData();
         
-        // Extrair nome do arquivo da URI
-        const fileNameFromUri = item.imageUri.split('/').pop();
-        
-        // Adicionar imagem ao FormData
+        // Nome padronizado para o arquivo
+        // Nome padronizado para o arquivo
+        const fileName = "PROVA-OCR.jpg";
+
+        // Adicionar imagem normalizada ao FormData
         formData.append('imagem', {
-          uri: item.imageUri,
+          uri: normalizedImageUri,
           type: 'image/jpeg',
-          name: fileNameFromUri || `prova_${item.id}.jpg`
+          name: fileName
         } as any);
         
         // Adicionar gabarito como uma string única
         formData.append('gabarito', prova.gabarito.join(''));
 
         console.log('Enviando para API:', {
-          uri: item.imageUri,
+          uri: normalizedImageUri,
+          name: fileName,
           gabarito: prova.gabarito.join('')
         });
 
@@ -134,10 +187,7 @@ export default function CorrecaoScreen() {
         const response = await fetch(API_URL, {
           method: 'POST',
           body: formData,
-          headers: {
-            'Accept': 'application/json',
-            // Remover 'Content-Type' quando usando FormData
-          },
+          // Não definimos 'Content-Type' para permitir o boundary automático
         });
 
         if (!response.ok) {
@@ -148,10 +198,43 @@ export default function CorrecaoScreen() {
         const resultado = await response.json();
         console.log('Resultado da API:', resultado);
 
+        // Verificar se todas as 10 respostas foram detectadas
+        if (!resultado.respostas_detectadas || 
+            resultado.respostas_detectadas.length < 10 || 
+            resultado.total_questoes !== 10) {
+          
+          // Erro: Não foram detectadas todas as 10 respostas
+          // Reverter para status pendente para permitir nova tentativa
+          const imagensRevertidas = imagens.map(img => 
+            img.id === item.id ? { ...img, status: 'pendente' as const } : img
+          );
+          setImagens(imagensRevertidas);
+          await salvarImagens(imagensRevertidas);
+          
+          // Mostrar mensagem de erro com opção de nova tentativa
+          Alert.alert(
+            'Erro na Correção',
+            `Foram detectadas apenas ${resultado.respostas_detectadas?.length || 0} de 10 questões. A qualidade da imagem pode não estar ideal.`,
+            [
+              { 
+                text: "Tentar novamente", 
+                onPress: () => Alert.alert(
+                  'Dicas para melhor captura',
+                  '• Certifique-se de que a imagem está bem iluminada\n• Capturar apenas a área do gabarito\n• Evitar reflexos ou sombras\n• Manter a câmera estável e alinhada',
+                  [{ text: "OK", style: "default" }]
+                ),
+                style: "default" 
+              }
+            ]
+          );
+          return;
+        }
+
         // Atualizar status para corrigido com resultado
         const imagensFinais = imagens.map(img => 
           img.id === item.id ? {
             ...img,
+            imageCroppedUri: normalizedImageUri, // Salvar URI da imagem normalizada
             status: 'corrigido' as const,
             resultado: {
               acertos: resultado.acertos,
@@ -177,7 +260,34 @@ export default function CorrecaoScreen() {
         );
         setImagens(imagensAtualizadas);
         await salvarImagens(imagensAtualizadas);
-        Alert.alert('Erro', `Não foi possível processar a correção: ${error.message}`);
+        
+        // Mensagem de erro mais descritiva baseada no tipo de falha
+        let errorMessage = error.message;
+        if (error.message.includes('Network request failed')) {
+          errorMessage = "Erro de conexão com o servidor. Verifique sua internet e tente novamente.";
+        } else if (error.message.includes('respostas_detectadas')) {
+          errorMessage = "A imagem não tem qualidade suficiente para detectar as respostas. Tente capturar novamente com melhor iluminação.";
+        }
+        
+        // Mostrar erro com opções para tentar novamente
+        Alert.alert(
+          'Erro na Correção',
+          `Não foi possível processar a correção: ${errorMessage}`,
+          [
+            { 
+              text: "Tentar novamente", 
+              onPress: () => {
+                // Opcionalmente, mostrar dicas para melhorar a captura
+                Alert.alert(
+                  'Dicas para melhor captura',
+                  '• Certifique-se de que a imagem está bem iluminada\n• Capturar apenas a área do gabarito\n• Evitar reflexos ou sombras\n• Manter a câmera estável e alinhada',
+                  [{ text: "OK", style: "default" }]
+                );
+              },
+              style: "default" 
+            }
+          ]
+        );
       }
     } else if (item.status === 'corrigido') {
       // Mostrar detalhes da correção
@@ -263,7 +373,7 @@ export default function CorrecaoScreen() {
             >
               <View style={styles.cardContent}>
                 <Image 
-                  source={{ uri: item.imageUri }}
+                  source={{ uri: item.imageCroppedUri || item.imageUri }}
                   style={styles.thumbnail}
                 />
                 

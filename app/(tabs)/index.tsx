@@ -59,19 +59,6 @@ export default function Home() {
           </LinearGradient>
         </TouchableOpacity>
 
-      <TouchableOpacity 
-          style={styles.buttonPrimary}
-          onPress={() => router.push('/Loginn')}
-        >
-          <LinearGradient
-            colors={['#3B5EDE', '#2F4FCD']}
-            style={styles.gradientButton}
-          >
-            <Feather name="camera" size={20} color="#FFFFFF" />
-            <Text style={styles.buttonTextPrimary}>Login</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
         <TouchableOpacity 
           style={styles.buttonPrimary}
           onPress={() => router.push('/CorrecaoScreen')}
@@ -86,7 +73,7 @@ export default function Home() {
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={styles.buttonSecondary}
+          style={styles.buttonPrimary}
           onPress={() => router.push('/CriarEditarProvaScreen')}
         >
           <View style={styles.buttonInner}>
@@ -113,6 +100,19 @@ export default function Home() {
             <Feather name="edit" size={20} color="#2F4FCD" />
             <Text style={styles.buttonTextSecondary}>Apagar tudo</Text>
           </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.buttonPrimary}
+          onPress={() => router.push('/Loginn')}
+        >
+          <LinearGradient
+            colors={['#3B5EDE', '#2F4FCD']}
+            style={styles.gradientButton}
+          >
+            <Feather name="camera" size={20} color="#FFFFFF" />
+            <Text style={styles.buttonTextPrimary}>Login</Text>
+          </LinearGradient>
         </TouchableOpacity>
 
       </View>
@@ -194,6 +194,7 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 16,
     backgroundColor: '#DDDBFF',
+    marginBottom: 15
   },
   buttonInner: {
     flexDirection: 'row',
