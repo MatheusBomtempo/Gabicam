@@ -252,7 +252,11 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
       console.log('Imagem normalizada para processamento:', normalizedUri);
       
       // Obtém as dimensões da imagem
-      const { width: photoWidth, height: photoHeight } = await new Promise((resolve) => {
+      interface ImageDimensions {
+        width: number;
+        height: number;
+      }
+      const { width: photoWidth, height: photoHeight } = await new Promise<ImageDimensions>((resolve) => {
         Image.getSize(normalizedUri, (width, height) => {
           resolve({ width, height });
         });
@@ -415,9 +419,10 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
         'Imagem salva com sucesso!',
         [{ text: 'OK', onPress: () => router.back() }]
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar imagem:', error);
-      Alert.alert('Erro', `Não foi possível salvar a imagem: ${error.message}`);
+      const errorMessage = error?.message || 'Erro desconhecido';
+      Alert.alert('Erro', `Não foi possível salvar a imagem: ${errorMessage}`);
     } finally {
       setIsSaving(false);
     }
@@ -637,7 +642,7 @@ const renderPreview = () => {
           </View>
 
           <View style={styles.overlayContainer}>
-            {/* Moldura melhorada com proporção mais adequada para o gabarito */}
+            
             <View style={[
               styles.frameGuide, 
               { 
