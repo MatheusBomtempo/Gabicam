@@ -379,25 +379,52 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
     );
   };
 
-  const renderPasta = ({ item }: { item: PastaProva }) => (
-    <TouchableOpacity 
-      style={styles.pastaCard}
-      onPress={() => setPastaSelecionada(item.id)}
-    >
-      <View style={styles.pastaContent}>
-        <View style={styles.pastaIconContainer}>
-          <Feather name="folder" size={24} color="#2F4FCD" />
+  const renderPasta = ({ item }: { item: PastaProva }) => {
+    // Contar provas por status
+    const provasPendentes = item.provas.filter(p => p.status === 'pendente').length;
+    const provasEmAnalise = item.provas.filter(p => p.status === 'em_analise').length;
+    const provasCorrigidas = item.provas.filter(p => p.status === 'corrigido').length;
+
+    return (
+      <TouchableOpacity 
+        style={styles.pastaCard}
+        onPress={() => setPastaSelecionada(item.id)}
+      >
+        <View style={styles.pastaContent}>
+          <View style={styles.pastaIconContainer}>
+            <Feather name="folder" size={24} color="#2F4FCD" />
+          </View>
+          <View style={styles.pastaInfo}>
+            <Text style={styles.pastaNome}>{item.nome}</Text>
+            <Text style={styles.pastaQuantidade}>
+              {item.provas.length} {item.provas.length === 1 ? 'prova' : 'provas'}
+            </Text>
+          </View>
+          <View style={styles.statusIndicators}>
+            {provasPendentes > 0 && (
+              <View style={styles.statusIndicator}>
+                <View style={[styles.statusCircle, { backgroundColor: '#F5A623' }]} />
+                <Text style={styles.statusNumber}>{provasPendentes}</Text>
+              </View>
+            )}
+            {provasEmAnalise > 0 && (
+              <View style={styles.statusIndicator}>
+                <View style={[styles.statusCircle, { backgroundColor: '#2F4FCD' }]} />
+                <Text style={styles.statusNumber}>{provasEmAnalise}</Text>
+              </View>
+            )}
+            {provasCorrigidas > 0 && (
+              <View style={styles.statusIndicator}>
+                <View style={[styles.statusCircle, { backgroundColor: '#27AE60' }]} />
+                <Text style={styles.statusNumber}>{provasCorrigidas}</Text>
+              </View>
+            )}
+          </View>
+          <Feather name="chevron-right" size={24} color="#2F4FCD" />
         </View>
-        <View style={styles.pastaInfo}>
-          <Text style={styles.pastaNome}>{item.nome}</Text>
-          <Text style={styles.pastaQuantidade}>
-            {item.provas.length} {item.provas.length === 1 ? 'prova' : 'provas'}
-          </Text>
-        </View>
-        <Feather name="chevron-right" size={24} color="#2F4FCD" />
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const renderHeader = () => (
     <View style={styles.header}>
@@ -742,5 +769,26 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Medium',
     color: '#2F4FCD',
     marginLeft: 8,
+  },
+  statusIndicators: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  statusCircle: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 4,
+  },
+  statusNumber: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
+    color: '#666',
   },
 });
