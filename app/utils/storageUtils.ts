@@ -73,3 +73,14 @@ export const debugStorage = async () => {
     console.error('Erro ao debugar storage:', error);
   }
 };
+
+// Exportação padrão com todas as funções
+const storageUtils = {
+  STORAGE_KEYS,
+  limparTodoArmazenamento,
+  limparProvas,
+  limparImagens,
+  debugStorage
+};
+
+export default storageUtils;
