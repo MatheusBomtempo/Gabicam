@@ -373,7 +373,7 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
             >
               <View style={styles.cardContent}>
                 <Image 
-                  source={{ uri: item.imageCroppedUri || item.imageUri }}
+                  source={{ uri: item.imageUri }}
                   style={styles.thumbnail}
                 />
                 
