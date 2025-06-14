@@ -32,7 +32,7 @@ interface ImagemCapturada {
   nomeAluno: string;
   nomeProva: string;
   imageUri: string;
-  imageCroppedUri?: string; // Imagem recortada/processada
+  imageCroppedUri?: string;
   dataCriacao: string;
   status: 'pendente' | 'em_analise' | 'corrigido';
   resultado?: {
@@ -40,6 +40,13 @@ interface ImagemCapturada {
     total: number;
     nota: number;
   };
+}
+
+interface PastaProva {
+  id: string;
+  nome: string;
+  dataCriacao: string;
+  provas: ImagemCapturada[];
 }
 
 const PROVAS_STORAGE_KEY = '@GabaritoApp:provas';
@@ -51,6 +58,8 @@ const NORMALIZED_IMAGES_DIR = `${FileSystem.cacheDirectory}normalized_images/`;
 export default function CorrecaoScreen() {
   const [imagens, setImagens] = useState<ImagemCapturada[]>([]);
   const [provas, setProvas] = useState<Prova[]>([]);
+  const [pastas, setPastas] = useState<PastaProva[]>([]);
+  const [pastaSelecionada, setPastaSelecionada] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   
@@ -85,7 +94,18 @@ export default function CorrecaoScreen() {
       // Carregar imagens
       const imagensArmazenadas = await AsyncStorage.getItem(IMAGENS_STORAGE_KEY);
       if (imagensArmazenadas) {
-        setImagens(JSON.parse(imagensArmazenadas));
+        const imagensData: ImagemCapturada[] = JSON.parse(imagensArmazenadas);
+        setImagens(imagensData);
+        
+        // Organizar imagens em pastas por prova
+        const pastasOrganizadas = provasData.map(prova => ({
+          id: prova.id,
+          nome: prova.nome,
+          dataCriacao: prova.dataCriacao,
+          provas: imagensData.filter(img => img.provaId === prova.id)
+        }));
+        
+        setPastas(pastasOrganizadas);
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -98,6 +118,14 @@ export default function CorrecaoScreen() {
   const salvarImagens = async (imagensAtualizadas: ImagemCapturada[]) => {
     try {
       await AsyncStorage.setItem(IMAGENS_STORAGE_KEY, JSON.stringify(imagensAtualizadas));
+      // Atualizar as pastas com as novas imagens
+      const pastasAtualizadas = provas.map(prova => ({
+        id: prova.id,
+        nome: prova.nome,
+        dataCriacao: prova.dataCriacao,
+        provas: imagensAtualizadas.filter(img => img.provaId === prova.id)
+      }));
+      setPastas(pastasAtualizadas);
     } catch (error) {
       console.error('Erro ao salvar imagens:', error);
     }
@@ -164,7 +192,6 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
         const formData = new FormData();
         
         // Nome padronizado para o arquivo
-        // Nome padronizado para o arquivo
         const fileName = "PROVA-OCR.jpg";
 
         // Adicionar imagem normalizada ao FormData
@@ -187,7 +214,6 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
         const response = await fetch(API_URL, {
           method: 'POST',
           body: formData,
-          // Não definimos 'Content-Type' para permitir o boundary automático
         });
 
         if (!response.ok) {
@@ -234,7 +260,7 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
         const imagensFinais = imagens.map(img => 
           img.id === item.id ? {
             ...img,
-            imageCroppedUri: normalizedImageUri, // Salvar URI da imagem normalizada
+            imageCroppedUri: normalizedImageUri,
             status: 'corrigido' as const,
             resultado: {
               acertos: resultado.acertos,
@@ -246,6 +272,28 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
         
         setImagens(imagensFinais);
         await salvarImagens(imagensFinais);
+        
+        // Atualizar a lista de provas na pasta atual
+        if (pastaSelecionada) {
+          const pastaAtual = pastas.find(p => p.id === pastaSelecionada);
+          if (pastaAtual) {
+            const provasAtualizadas = pastaAtual.provas.map(p => 
+              p.id === item.id ? {
+                ...p,
+                status: 'corrigido' as const,
+                resultado: {
+                  acertos: resultado.acertos,
+                  total: resultado.total_questoes,
+                  nota: (resultado.acertos / resultado.total_questoes) * 10
+                }
+              } : p
+            );
+            const pastasAtualizadas = pastas.map(p => 
+              p.id === pastaSelecionada ? { ...p, provas: provasAtualizadas } : p
+            );
+            setPastas(pastasAtualizadas);
+          }
+        }
         
         Alert.alert(
           'Correção Concluída',
@@ -331,38 +379,58 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
     );
   };
 
+  const renderPasta = ({ item }: { item: PastaProva }) => (
+    <TouchableOpacity 
+      style={styles.pastaCard}
+      onPress={() => setPastaSelecionada(item.id)}
+    >
+      <View style={styles.pastaContent}>
+        <View style={styles.pastaIconContainer}>
+          <Feather name="folder" size={24} color="#2F4FCD" />
+        </View>
+        <View style={styles.pastaInfo}>
+          <Text style={styles.pastaNome}>{item.nome}</Text>
+          <Text style={styles.pastaQuantidade}>
+            {item.provas.length} {item.provas.length === 1 ? 'prova' : 'provas'}
+          </Text>
+        </View>
+        <Feather name="chevron-right" size={24} color="#2F4FCD" />
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <Text style={styles.title}>
+        {pastaSelecionada ? 'Provas para Correção' : 'Pastas de Provas'}
+      </Text>
+      {pastaSelecionada && (
+        <TouchableOpacity 
+          style={styles.voltarButton}
+          onPress={() => setPastaSelecionada(null)}
+        >
+          <Feather name="arrow-left" size={24} color="#2F4FCD" />
+          <Text style={styles.voltarText}>Voltar</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       
-      <View style={styles.header}>
-        <Text style={styles.title}>Correção de Provas</Text>
-      </View>
+      {renderHeader()}
       
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2F4FCD" />
-          <Text style={styles.loadingText}>Carregando imagens...</Text>
+          <Text style={styles.loadingText}>Carregando...</Text>
         </View>
-      ) : imagens.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconContainer}>
-            <Feather name="camera-off" size={60} color="#2F4FCD" />
-          </View>
-          <Text style={styles.emptyText}>Nenhuma imagem capturada</Text>
-          <Text style={styles.emptySubText}>
-            Capture imagens das provas para iniciar a correção
-          </Text>
-          <TouchableOpacity 
-            style={styles.capturarButton}
-            onPress={() => router.push('/CriarEditarProvaScreen')}
-          >
-            <Text style={styles.capturarButtonText}>Ir para minhas provas</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
+      ) : pastaSelecionada ? (
+        // Renderizar provas da pasta selecionada
         <FlatList
-          data={imagens}
+          data={pastas.find(p => p.id === pastaSelecionada)?.provas || []}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           renderItem={({ item }) => (
@@ -420,6 +488,30 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
               />
             </TouchableOpacity>
           )}
+        />
+      ) : pastas.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIconContainer}>
+            <Feather name="folder" size={60} color="#2F4FCD" />
+          </View>
+          <Text style={styles.emptyText}>Nenhuma pasta de provas</Text>
+          <Text style={styles.emptySubText}>
+            Crie uma prova para começar a organizar as correções
+          </Text>
+          <TouchableOpacity 
+            style={styles.capturarButton}
+            onPress={() => router.push('/CriarEditarProvaScreen')}
+          >
+            <Text style={styles.capturarButtonText}>Criar nova prova</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        // Renderizar lista de pastas
+        <FlatList
+          data={pastas}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          renderItem={renderPasta}
         />
       )}
     </SafeAreaView>
@@ -601,5 +693,54 @@ const styles = StyleSheet.create({
   },
   cardIcon: {
     marginLeft: 10,
-  }
+  },
+  pastaCard: {
+    backgroundColor: '#DDDBFF',
+    borderRadius: 16,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: -4, height: -4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  pastaContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pastaIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  pastaInfo: {
+    flex: 1,
+  },
+  pastaNome: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    color: '#2F4FCD',
+    marginBottom: 4,
+  },
+  pastaQuantidade: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: '#666',
+  },
+  voltarButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  voltarText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    color: '#2F4FCD',
+    marginLeft: 8,
+  },
 });
