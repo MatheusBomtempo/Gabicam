@@ -104,10 +104,10 @@ export default function CorrecaoScreen() {
   };
 
 // Função para normalizar a imagem para um formato padronizado
-const normalizeImage = async (imageUri: string): Promise<string> => {
+const normalizeImage = async (imageUri: string, imageId: string): Promise<string> => {
   try {
-    // Criar um nome padronizado para o arquivo (sempre o mesmo nome)
-    const normalizedFilename = `PROVA-OCR.jpg`;
+    // Criar um nome único para o arquivo baseado no ID da imagem
+    const normalizedFilename = `PROVA-OCR_${imageId}.jpg`;
     const normalizedFilePath = `${NORMALIZED_IMAGES_DIR}${normalizedFilename}`;
     
     // Converter para JPG com qualidade máxima
@@ -119,7 +119,7 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
     
     console.log("Imagem convertida para JPG:", convertedImage.uri);
     
-    // Salvar com nome padronizado
+    // Salvar com nome único
     await FileSystem.moveAsync({
       from: convertedImage.uri,
       to: normalizedFilePath
@@ -158,7 +158,7 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
         }
 
         // Normalizar a imagem antes de enviar
-        const normalizedImageUri = await normalizeImage(item.imageUri);
+        const normalizedImageUri = await normalizeImage(item.imageUri, item.id);
         
         // Preparar dados para API
         const formData = new FormData();
@@ -262,11 +262,14 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
         await salvarImagens(imagensAtualizadas);
         
         // Mensagem de erro mais descritiva baseada no tipo de falha
-        let errorMessage = error.message;
-        if (error.message.includes('Network request failed')) {
-          errorMessage = "Erro de conexão com o servidor. Verifique sua internet e tente novamente.";
-        } else if (error.message.includes('respostas_detectadas')) {
-          errorMessage = "A imagem não tem qualidade suficiente para detectar as respostas. Tente capturar novamente com melhor iluminação.";
+        let errorMessage = 'Erro desconhecido';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+          if (error.message.includes('Network request failed')) {
+            errorMessage = "Erro de conexão com o servidor. Verifique sua internet e tente novamente.";
+          } else if (error.message.includes('respostas_detectadas')) {
+            errorMessage = "A imagem não tem qualidade suficiente para detectar as respostas. Tente capturar novamente com melhor iluminação.";
+          }
         }
         
         // Mostrar erro com opções para tentar novamente
@@ -373,7 +376,7 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
             >
               <View style={styles.cardContent}>
                 <Image 
-                  source={{ uri: item.imageCroppedUri || item.imageUri }}
+                  source={{ uri: item.imageUri }}
                   style={styles.thumbnail}
                 />
                 
