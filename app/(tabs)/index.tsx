@@ -14,12 +14,22 @@ import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { useAuth } from '../../contexts/AuthContext';
 
 
 const { width } = Dimensions.get('window');
 
 export default function Home() {
   const router = useRouter();
+  const { signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -27,6 +37,12 @@ export default function Home() {
       
       <View style={styles.header}>
         <Text style={styles.logo}>GabiCam</Text>
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleSignOut}
+        >
+          <Feather name="log-out" size={24} color="#2F4FCD" />
+        </TouchableOpacity>
       </View>
       
       {/* <View style={styles.imageContainer}>
@@ -127,8 +143,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   header: {
-    marginTop: Platform.OS === 'android' ? 40 : 10,
-    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 40,
+    paddingBottom: 15,
   },
   logo: {
     fontSize: 24,
@@ -213,5 +233,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Poppins-Bold',
     marginLeft: 10,
+  },
+  logoutButton: {
+    padding: 8,
   },
 });
