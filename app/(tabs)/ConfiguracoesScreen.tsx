@@ -105,6 +105,34 @@ export default function ConfiguracoesScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Desenvolvimento</Text>
+          
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => router.push('/TesteScreen')}
+          >
+            <Feather name="wifi" size={24} color="#2F4FCD" />
+            <View style={styles.buttonTextContainer}>
+              <Text style={styles.buttonTitle}>Teste API</Text>
+              <Text style={styles.buttonSubtitle}>Testar conexão com o servidor</Text>
+            </View>
+          </TouchableOpacity>
+
+          {__DEV__ && (
+            <TouchableOpacity 
+              style={styles.button}
+              onPress={debugStorage}
+            >
+              <Feather name="terminal" size={24} color="#2F4FCD" />
+              <View style={styles.buttonTextContainer}>
+                <Text style={styles.buttonTitle}>Debug Storage</Text>
+                <Text style={styles.buttonSubtitle}>Ver dados armazenados no console</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Gerenciamento de Dados</Text>
           
           <TouchableOpacity 
@@ -135,28 +163,11 @@ export default function ConfiguracoesScreen() {
           >
             <Feather name="trash-2" size={24} color="#FF6B6B" />
             <View style={styles.buttonTextContainer}>
-              <Text style={[styles.buttonTitle, styles.dangerText]}>Limpar Todos os Dados</Text>
+              <Text style={[styles.buttonTitle, styles.dangerText]}>Apagar Tudo</Text>
               <Text style={[styles.buttonSubtitle, styles.dangerText]}>Remove todos os dados do aplicativo</Text>
             </View>
           </TouchableOpacity>
         </View>
-
-        {__DEV__ && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Desenvolvimento</Text>
-            
-            <TouchableOpacity 
-              style={styles.button}
-              onPress={debugStorage}
-            >
-              <Feather name="terminal" size={24} color="#2F4FCD" />
-              <View style={styles.buttonTextContainer}>
-                <Text style={styles.buttonTitle}>Debug Storage</Text>
-                <Text style={styles.buttonSubtitle}>Ver dados armazenados no console</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -176,7 +187,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: 'System',
+    fontWeight: '700',
     color: '#2F4FCD',
   },
   content: {
@@ -187,7 +199,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: 'System',
+    fontWeight: '700',
     color: '#2F4FCD',
     marginBottom: 15,
   },
@@ -198,29 +211,31 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 15,
     marginBottom: 15,
-    // Estilo neomorphism
     shadowColor: '#FFFFFF',
-    shadowOffset: { width: -4, height: -4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
+    shadowOffset: { width: -3, height: -3 },
+    shadowOpacity: 0.8,
+    shadowRadius: 5,
     elevation: 5,
   },
-  dangerButton: {
-    backgroundColor: '#FFE0E0',
-  },
   buttonTextContainer: {
-    marginLeft: 15,
     flex: 1,
+    marginLeft: 15,
   },
   buttonTitle: {
     fontSize: 16,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: 'System',
+    fontWeight: '600',
     color: '#2F4FCD',
+    marginBottom: 4,
   },
   buttonSubtitle: {
     fontSize: 14,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: 'System',
+    fontWeight: '400',
     color: '#666',
+  },
+  dangerButton: {
+    backgroundColor: '#FFE8E8',
   },
   dangerText: {
     color: '#FF6B6B',
