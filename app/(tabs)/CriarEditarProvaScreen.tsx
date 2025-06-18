@@ -380,6 +380,14 @@ export default function CriarEditarProvaScreen() {
           </View>
         </View>
       </Modal>
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setModalVisible(true)}
+        activeOpacity={0.8}
+      >
+        <Feather name="plus" size={32} color="#fff" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -562,5 +570,22 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 10,
     marginRight: 10,
+  },
+  fab: {
+    position: 'absolute',
+    right: 24,
+    bottom: 32,
+    backgroundColor: '#2F4FCD',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#2F4FCD',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    zIndex: 100,
   },
 });
