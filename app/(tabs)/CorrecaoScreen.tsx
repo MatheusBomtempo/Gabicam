@@ -19,6 +19,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
+import HeaderPadrao from '../../components/HeaderPadrao';
 
 interface Prova {
   id: string;
@@ -112,7 +113,7 @@ export default function CorrecaoScreen() {
         
         setPastas(pastasOrganizadas);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar dados:', error);
       Alert.alert('Erro', 'Não foi possível carregar os dados.');
     } finally {
@@ -131,7 +132,7 @@ export default function CorrecaoScreen() {
         provas: imagensAtualizadas.filter(img => img.provaId === prova.id)
       }));
       setPastas(pastasAtualizadas);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar imagens:', error);
     }
   };
@@ -159,7 +160,7 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
     });
     
     return normalizedFilePath;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao normalizar imagem:", error);
     // Em caso de erro, retorna a imagem original
     return imageUri;
@@ -305,7 +306,7 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
           `Aluno: ${item.nomeAluno}\nNota: ${((resultado.acertos / resultado.total_questoes) * 10).toFixed(1)}\nAcertos: ${resultado.acertos}/${resultado.total_questoes}`
         );
         
-      } catch (error) {
+      } catch (error: any) {
         console.error('Erro ao processar correção:', error);
         // Reverter para status pendente em caso de erro
         const imagensAtualizadas = imagens.map(img => 
@@ -497,145 +498,124 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
     }
   };
 
-  const renderHeader = () => (
-    <View style={styles.header}>
-      <Text style={styles.title}>
-        {pastaSelecionada ? 'Provas para Correção' : 'Pastas de Provas'}
-      </Text>
-      {pastaSelecionada && (
-        <View style={styles.headerButtons}>
-          <TouchableOpacity 
-            style={styles.voltarButton}
-            onPress={() => setPastaSelecionada(null)}
-          >
-            <Feather name="arrow-left" size={24} color="#2F4FCD" />
-            <Text style={styles.voltarText}>Voltar</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.salvarContainer}>
-            <TouchableOpacity 
-              style={[styles.salvarButton, isSaving && styles.salvarButtonDisabled]}
-              onPress={salvarResultados}
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Feather name="save" size={20} color="#FFFFFF" />
-                  <Text style={styles.salvarButtonText}>Salvar Resultados</Text>
-                </>
-              )}
-            </TouchableOpacity>
-            
-            {ultimaSalvamento && (
-              <Text style={styles.ultimaSalvamentoText}>
-                Último salvamento: {new Date(ultimaSalvamento).toLocaleString('pt-BR')}
-              </Text>
-            )}
-          </View>
-        </View>
-      )}
-    </View>
-  );
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      
-      {renderHeader()}
-      
+      <HeaderPadrao title="Corrigir Provas" />
+
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2F4FCD" />
-          <Text style={styles.loadingText}>Carregando...</Text>
+          <Text style={styles.loadingText}>Carregando provas...</Text>
         </View>
-      ) : pastaSelecionada ? (
-        // Renderizar provas da pasta selecionada
-        <FlatList
-          data={pastas.find(p => p.id === pastaSelecionada)?.provas || []}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
-          renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={styles.imagemCard}
-              onPress={() => iniciarCorrecao(item)}
-              disabled={item.status === 'em_analise'}
-            >
-              <View style={styles.cardContent}>
-                <Image 
-                  source={{ uri: item.imageUri }}
-                  style={styles.thumbnail}
-                />
-                
-                <View style={styles.imagemInfo}>
-                  <Text style={styles.alunoNome}>{item.nomeAluno}</Text>
-                  <Text style={styles.provaNome}>Prova: {item.nomeProva}</Text>
-                  <Text style={styles.imagemData}>
-                    Capturada em: {item.dataCriacao}
-                  </Text>
-                  
-                  {renderStatusBadge(item.status)}
-                  
-                  {item.status === 'corrigido' && item.resultado && (
-                    <View style={styles.resultadoContainer}>
-                      <Text style={styles.resultadoText}>
-                        Nota: <Text style={styles.notaText}>{item.resultado.nota.toFixed(1)}</Text>
-                      </Text>
-                      <Text style={styles.acertosText}>
-                        {item.resultado.acertos}/{item.resultado.total} acertos
-                      </Text>
-                    </View>
-                  )}
-                  
-                  {item.status === 'em_analise' && (
-                    <View style={styles.analisandoContainer}>
-                      <ActivityIndicator size="small" color="#F5A623" />
-                      <Text style={styles.analisandoText}>Processando...</Text>
-                    </View>
-                  )}
-                  
-                  {item.status === 'pendente' && (
-                    <Text style={styles.pendingText}>
-                      Toque para iniciar a correção
+      ) : (
+        <View style={styles.content}>
+          {pastaSelecionada ? (
+            <View style={styles.pastaSelecionadaContainer}>
+              <View style={styles.pastaHeader}>
+                <View style={{ width: 50 }} />
+                <View style={{ flex: 1 }} />
+                <View style={styles.salvarColuna}>
+                  <TouchableOpacity 
+                    style={[styles.salvarButton, isSaving && styles.salvarButtonDisabled]}
+                    onPress={salvarResultados}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Feather name="save" size={20} color="#FFFFFF" />
+                        <Text style={styles.salvarButtonText}>Salvar</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  {ultimaSalvamento && (
+                    <Text style={styles.ultimaSalvamentoText}>
+                      Último salvamento:{"\n"}{new Date(ultimaSalvamento).toLocaleString('pt-BR')}
                     </Text>
                   )}
                 </View>
               </View>
               
-              <Feather 
-                name={item.status === 'corrigido' ? 'eye' : 'chevron-right'} 
-                size={24} 
-                color="#2F4FCD" 
-                style={styles.cardIcon}
+              <FlatList
+                data={pastas.find(p => p.id === pastaSelecionada)?.provas || []}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity 
+                    style={styles.imagemCard}
+                    onPress={() => iniciarCorrecao(item)}
+                    disabled={item.status === 'em_analise'}
+                  >
+                    <View style={styles.cardContent}>
+                      <Image 
+                        source={{ uri: item.imageUri }}
+                        style={styles.thumbnail}
+                      />
+                      
+                      <View style={styles.imagemInfo}>
+                        <Text style={styles.alunoNome}>{item.nomeAluno}</Text>
+                        <Text style={styles.provaNome}>Prova: {item.nomeProva}</Text>
+                        <Text style={styles.imagemData}>
+                          Capturada em: {item.dataCriacao}
+                        </Text>
+                        
+                        {renderStatusBadge(item.status)}
+                        
+                        {item.status === 'corrigido' && item.resultado && (
+                          <View style={styles.resultadoContainer}>
+                            <Text style={styles.resultadoText}>
+                              Nota: <Text style={styles.notaText}>{item.resultado.nota.toFixed(1)}</Text>
+                            </Text>
+                            <Text style={styles.acertosText}>
+                              {item.resultado.acertos}/{item.resultado.total} acertos
+                            </Text>
+                          </View>
+                        )}
+                        
+                        {item.status === 'em_analise' && (
+                          <View style={styles.analisandoContainer}>
+                            <ActivityIndicator size="small" color="#F5A623" />
+                            <Text style={styles.analisandoText}>Processando...</Text>
+                          </View>
+                        )}
+                        
+                        {item.status === 'pendente' && (
+                          <Text style={styles.pendingText}>
+                            Toque para iniciar a correção
+                          </Text>
+                        )}
+                      </View>
+                      
+                      <Feather 
+                        name={item.status === 'corrigido' ? 'eye' : 'chevron-right'} 
+                        size={24} 
+                        color="#2F4FCD" 
+                        style={styles.cardIcon}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                )}
+                contentContainerStyle={styles.listContainer}
               />
-            </TouchableOpacity>
+            </View>
+          ) : pastas.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Feather name="folder" size={64} color="#DDDBFF" />
+              <Text style={styles.emptyText}>Nenhuma prova encontrada</Text>
+              <Text style={styles.emptySubtext}>
+                Capture fotos de provas para começar a corrigir
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={pastas}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => renderPasta({ item })}
+              contentContainerStyle={styles.listContainer}
+            />
           )}
-        />
-      ) : pastas.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconContainer}>
-            <Feather name="folder" size={60} color="#2F4FCD" />
-          </View>
-          <Text style={styles.emptyText}>Nenhuma pasta de provas</Text>
-          <Text style={styles.emptySubText}>
-            Crie uma prova para começar a organizar as correções
-          </Text>
-          <TouchableOpacity 
-            style={styles.capturarButton}
-            onPress={() => router.push('/CriarEditarProvaScreen')}
-          >
-            <Text style={styles.capturarButtonText}>Criar nova prova</Text>
-          </TouchableOpacity>
         </View>
-      ) : (
-        // Renderizar lista de pastas
-        <FlatList
-          data={pastas}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
-          renderItem={renderPasta}
-        />
       )}
     </SafeAreaView>
   );
@@ -651,7 +631,7 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingBottom: 15,
   },
-  title: {
+  headerTitle: {
     fontSize: 24,
     fontFamily: 'Poppins-Bold',
     color: '#2F4FCD',
@@ -673,53 +653,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#DDDBFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    // Estilo neomorphism
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: -6, height: -6 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    elevation: 5,
-  },
   emptyText: {
     fontSize: 20,
     fontFamily: 'Poppins-Bold',
     color: '#2F4FCD',
     marginBottom: 10,
   },
-  emptySubText: {
+  emptySubtext: {
     fontSize: 16,
     fontFamily: 'Poppins-Regular',
     color: '#666',
     textAlign: 'center',
     marginBottom: 30,
   },
-  capturarButton: {
-    backgroundColor: '#2F4FCD',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    // Estilo neomorphism
-    shadowColor: 'rgba(47, 79, 205, 0.5)',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 5,
+  content: {
+    flex: 1,
   },
-  capturarButtonText: {
+  pastaSelecionadaContainer: {
+    flex: 1,
+  },
+  pastaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
+  },
+  salvarColuna: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    gap: 0,
+  },
+  salvarButton: {
+    backgroundColor: '#2F4FCD',
+    padding: 10,
+    borderRadius: 8,
+    marginLeft: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  salvarButtonDisabled: {
+    backgroundColor: '#DDDBFF',
+  },
+  salvarButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontFamily: 'Poppins-Bold',
+    marginLeft: 10,
   },
-  listContainer: {
-    padding: 15,
+  ultimaSalvamentoText: {
+    fontSize: 13,
+    fontFamily: 'Poppins-Regular',
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 10,
   },
   imagemCard: {
     flexDirection: 'row',
@@ -855,17 +844,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Regular',
     color: '#666',
   },
-  voltarButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  voltarText: {
-    fontSize: 16,
-    fontFamily: 'Poppins-Medium',
-    color: '#2F4FCD',
-    marginLeft: 8,
-  },
   statusIndicators: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -887,39 +865,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Medium',
     color: '#666',
   },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  salvarContainer: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-  },
-  salvarButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#27AE60',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginLeft: 10,
-  },
-  salvarButtonDisabled: {
-    opacity: 0.7,
-  },
-  salvarButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    marginLeft: 8,
-  },
-  ultimaSalvamentoText: {
-    color: '#999',
-    fontSize: 11,
-    fontFamily: 'Poppins-Regular',
-    marginTop: 4,
-    marginRight: 10,
+  listContainer: {
+    padding: 20,
   },
 });

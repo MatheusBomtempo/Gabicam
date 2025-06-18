@@ -14,6 +14,9 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import ImageResizer from 'react-native-image-resizer';
+import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import HeaderPadrao from '../../components/HeaderPadrao';
 
 const API_URL = Platform.OS === 'android'
   ? 'http://192.168.2.103:5000/corrigir'
@@ -29,6 +32,7 @@ export default function TesteScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [normalizedImage, setNormalizedImage] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const router = useRouter();
 
   // Criar o diretório para imagens normalizadas se não existir
   useEffect(() => {
@@ -214,73 +218,66 @@ export default function TesteScreen() {
   // Interface do usuário
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Teste de Requisição</Text>
+      <HeaderPadrao title="Teste API" />
 
-      <View style={styles.card}>
-        <Text style={styles.subtitle}>Informações da Requisição</Text>
-        <Text style={styles.info}>URL: {API_URL}</Text>
-        <Text style={styles.info}>Gabarito: ABCDEABCDE</Text>
-      </View>
+      <View style={styles.content}>
+        <Text style={styles.title}>Teste de Correção de Provas</Text>
+        <Text style={styles.subtitle}>
+          Selecione uma imagem de prova para testar a API de correção
+        </Text>
 
-      {selectedImage && (
-        <View style={styles.imagePreview}>
-          <Text style={styles.subtitle}>Imagem Original</Text>
-          <Image
-            source={{ uri: selectedImage }}
-            style={styles.image}
-            resizeMode="contain"
-          />
-        </View>
-      )}
+        <TouchableOpacity style={styles.selectButton} onPress={selecionarImagem}>
+          <Text style={styles.selectButtonText}>Selecionar Imagem</Text>
+        </TouchableOpacity>
 
-      {normalizedImage && (
-        <View style={styles.imagePreview}>
-          <Text style={styles.subtitle}>Imagem Normalizada</Text>
-          <Image
-            source={{ uri: normalizedImage }}
-            style={styles.image}
-            resizeMode="contain"
-          />
-        </View>
-      )}
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={selecionarImagem}
-      >
-        <Text style={styles.buttonText}>Selecionar Imagem</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.button, styles.sendButton, (!normalizedImage && !selectedImage) && styles.disabledButton]}
-        onPress={fazerRequisicao}
-        disabled={(!normalizedImage && !selectedImage) || isLoading}
-      >
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator color="#fff" />
-            <Text style={styles.loadingText}>Enviando... {uploadProgress.toFixed(0)}%</Text>
+        {selectedImage && (
+          <View style={styles.imageContainer}>
+            <Text style={styles.imageTitle}>Imagem Selecionada:</Text>
+            <Image source={{ uri: selectedImage }} style={styles.selectedImage} />
           </View>
-        ) : (
-          <Text style={styles.buttonText}>Enviar</Text>
         )}
-      </TouchableOpacity>
 
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>Erro:</Text>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
+        {normalizedImage && (
+          <View style={styles.imageContainer}>
+            <Text style={styles.imageTitle}>Imagem Normalizada:</Text>
+            <Image source={{ uri: normalizedImage }} style={styles.selectedImage} />
+          </View>
+        )}
 
-      {response && (
-        <View style={styles.responseContainer}>
-          <Text style={styles.responseTitle}>Resposta:</Text>
-          <Text style={styles.responseText}>
-            {JSON.stringify(response, null, 2)}
-          </Text>
-        </View>
-      )}
+        {uploadProgress > 0 && uploadProgress < 100 && (
+          <View style={styles.progressContainer}>
+            <Text style={styles.progressText}>Enviando: {uploadProgress.toFixed(1)}%</Text>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${uploadProgress}%` }]} />
+            </View>
+          </View>
+        )}
+
+        <TouchableOpacity 
+          style={[styles.testButton, (!normalizedImage && !selectedImage) && styles.disabledButton]} 
+          onPress={fazerRequisicao}
+          disabled={!normalizedImage && !selectedImage || isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.testButtonText}>Testar Correção</Text>
+          )}
+        </TouchableOpacity>
+
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Erro: {error}</Text>
+          </View>
+        )}
+
+        {response && (
+          <View style={styles.responseContainer}>
+            <Text style={styles.responseTitle}>Resposta da API:</Text>
+            <Text style={styles.responseText}>{JSON.stringify(response, null, 2)}</Text>
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -290,6 +287,9 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: '#fff',
+  },
+  content: {
+    flex: 1,
   },
   title: {
     fontSize: 24,
@@ -303,54 +303,71 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: '#2F4FCD',
   },
-  card: {
-    backgroundColor: '#f5f5f5',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20,
-  },
-  info: {
-    fontSize: 14,
-    marginBottom: 5,
-    color: '#333',
-  },
-  button: {
+  selectButton: {
     backgroundColor: '#2F4FCD',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 15,
   },
-  sendButton: {
-    backgroundColor: '#27AE60',
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-  },
-  buttonText: {
+  selectButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  imageContainer: {
+    marginBottom: 20,
   },
-  loadingText: {
+  imageTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    color: '#2F4FCD',
+  },
+  selectedImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 10,
+  },
+  progressContainer: {
+    marginBottom: 20,
+  },
+  progressText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    color: '#333',
+  },
+  progressBar: {
+    height: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#2F4FCD',
+    borderRadius: 5,
+  },
+  testButton: {
+    backgroundColor: '#2F4FCD',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  testButtonText: {
     color: '#fff',
-    marginLeft: 10,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   errorContainer: {
     backgroundColor: '#ffebee',
     padding: 15,
     borderRadius: 10,
     marginTop: 20,
-  },
-  errorTitle: {
-    color: '#c62828',
-    fontWeight: 'bold',
-    marginBottom: 5,
   },
   errorText: {
     color: '#c62828',
@@ -369,13 +386,5 @@ const styles = StyleSheet.create({
   responseText: {
     color: '#2e7d32',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  imagePreview: {
-    marginBottom: 20,
-  },
-  image: {
-    width: '100%',
-    height: 200,
-    borderRadius: 10,
   },
 });

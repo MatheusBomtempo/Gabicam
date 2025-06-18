@@ -1,99 +1,50 @@
-// Login.tsx
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, Image, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+// Login sem Firebase
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
-import { auth } from '../../firebase'; // Importando a configuração do Firebase
-
-// Redirecionamento para OAuth
-WebBrowser.maybeCompleteAuthSession();
-
-// Suas credenciais do Google
-// Você precisa configurar estas credenciais no Google Cloud Console
-const ANDROID_CLIENT_ID = "448832247805-t0g9c2b8t59fnukuchuflvo0c01vtlb4.apps.googleusercontent.com"; // Adicione seu Android client ID 
-const WEB_CLIENT_ID = "448832247805-u7h1qis1bsv6437hbp1poj8lsdd3ihqb.apps.googleusercontent.com"; // Adicione seu Web client ID
 
 export default function Login() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Configuração do Google Auth
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: ANDROID_CLIENT_ID,
-    webClientId: WEB_CLIENT_ID,
-    expoClientId: WEB_CLIENT_ID,
-  });
-
-  useEffect(() => {
-    if (response?.type === 'success') {
-      setLoading(true);
-      const { id_token } = response.params;
-      
-      const credential = GoogleAuthProvider.credential(id_token);
-      signInWithCredential(auth, credential)
-        .then(result => {
-          setUser(result.user);
-          console.log("Usuário logado com sucesso:", result.user);
-          // Aqui você pode navegar para a próxima tela após o login
-        })
-        .catch(error => {
-          console.error("Erro ao fazer login com Google:", error);
-          setError('Ocorreu um erro durante o login. Tente novamente.');
-        })
-        .finally(() => setLoading(false));
-    }
-  }, [response]);
 
   const handleSignIn = async () => {
     setError('');
     setLoading(true);
-    try {
-      await promptAsync();
-    } catch (error) {
-      console.error("Erro ao iniciar login com Google:", error);
-      setError('Não foi possível iniciar o processo de login. Tente novamente.');
+    setTimeout(() => {
+      setUser({ displayName: 'Usuário', email: 'usuario@email.com' });
       setLoading(false);
-    }
+    }, 1000);
   };
 
   return (
     <View style={styles.container}>
       <StatusBar style="auto" />
-      
       <View style={styles.logoContainer}>
         <Image 
           source={require('../../assets/images/google-logo.png')} 
           style={styles.logo}
-          // Substitua pelo caminho da sua logo
         />
         <Text style={styles.welcomeText}>Bem-vindo</Text>
         <Text style={styles.subtitle}>Faça login para continuar</Text>
       </View>
-
       {loading ? (
         <ActivityIndicator size="large" color="#4285F4" />
       ) : (
         <TouchableOpacity 
           style={styles.googleButton}
           onPress={handleSignIn}
-          disabled={!request}
         >
           <Image 
             source={require('../../assets/images/google-logo.png')} 
             style={styles.googleIcon}
-            // Substitua pelo caminho do ícone do Google
           />
           <Text style={styles.googleButtonText}>
-            Entrar com Google
+            Entrar (fictício)
           </Text>
         </TouchableOpacity>
       )}
-      
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      
       {user && (
         <View style={styles.userInfoContainer}>
           <Text style={styles.successText}>

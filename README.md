@@ -4,6 +4,16 @@ Este é um projeto [Expo](https://expo.dev) criado com [`create-expo-app`](https
 
 O GabiCam é um aplicativo React Native para capturar, corrigir e gerenciar provas através de reconhecimento óptico de caracteres (OCR).
 
+## Novidades e Características
+
+- **Login fictício**: O app não depende mais de autenticação real, facilitando testes e uso offline.
+- **Header padronizado**: Todas as telas possuem um cabeçalho unificado, com botão de voltar e título centralizado, para melhor navegação e experiência.
+- **Thumbnails persistentes**: As miniaturas das provas são salvas e exibidas corretamente mesmo após fechar e reabrir o app.
+- **Gerenciamento local**: Todo o armazenamento de provas, imagens e resultados é feito localmente usando AsyncStorage e FileSystem.
+- **Sem Firebase**: Toda a integração com Firebase foi removida, tornando o app mais leve e independente.
+- **Fluxo completo de correção**: Crie provas, cadastre gabaritos, capture fotos, corrija automaticamente e visualize resultados, tudo em poucos toques.
+- **Configurações avançadas**: Limpe provas, imagens ou todos os dados do app facilmente pela tela de configurações.
+
 ## Começando
 
 1. Instale as dependências
@@ -30,12 +40,16 @@ Você pode começar a desenvolver editando os arquivos dentro do diretório **ap
 - Capturar fotos de folhas de resposta usando a câmera
 - Correção automática usando tecnologia OCR
 - Visualizar resultados e estatísticas das correções
+- Login fictício para testes rápidos
+- Thumbnails persistentes das provas
+- Gerenciamento e limpeza de dados pelo app
+- Header padronizado em todas as telas
 
 ## Armazenamento de Dados
 
-Este aplicativo usa **AsyncStorage** para persistência local de dados. Todos os dados das provas, gabaritos, imagens capturadas e resultados das correções são armazenados localmente no dispositivo usando as seguintes chaves de armazenamento:
+Este aplicativo usa **AsyncStorage** e **FileSystem** para persistência local de dados. Todos os dados das provas, gabaritos, imagens capturadas e resultados das correções são armazenados localmente no dispositivo usando as seguintes chaves de armazenamento:
 
-- `@GabaritoApp:provas` - Armazena modelos de provas e gabaritos
+- `@GabaritoApp:provas` - Armazena modelos de provas, gabaritos e caminhos das imagens
 - `@GabaritoApp:imagens` - Armazena imagens capturadas e resultados das correções
 
 Utilitários de armazenamento estão disponíveis em `app/utils/storageUtils.ts` para operações de gerenciamento de dados.

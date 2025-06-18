@@ -10,6 +10,7 @@ import {
   TextInput,
   Alert,
   SafeAreaView,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
@@ -17,6 +18,7 @@ import { Link, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
+import HeaderPadrao from '../../components/HeaderPadrao';
 
 // Interface para tipagem das provas
 interface Prova {
@@ -186,16 +188,7 @@ export default function CriarEditarProvaScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-
-      <View style={styles.header}>
-        <Text style={styles.title}>Minhas Provas</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setModalVisible(true)}
-        >
-          <Feather name="plus" size={24} color="#2F4FCD" />
-        </TouchableOpacity>
-      </View>
+      <HeaderPadrao title="Minhas Provas" />
 
       {provas.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -223,12 +216,19 @@ export default function CriarEditarProvaScreen() {
                 }}
               >
                 <View style={styles.provaInfo}>
-                  <Feather
-                    name="file-text"
-                    size={24}
-                    color="#2F4FCD"
-                    style={styles.provaIcon}
-                  />
+                  {item.fotos && item.fotos.length > 0 ? (
+                    <Image
+                      source={{ uri: item.fotos[0] }}
+                      style={styles.thumbnail}
+                    />
+                  ) : (
+                    <Feather
+                      name="file-text"
+                      size={24}
+                      color="#2F4FCD"
+                      style={styles.provaIcon}
+                    />
+                  )}
                   <View>
                     <Text style={styles.provaNome}>{item.nome}</Text>
                     <Text style={styles.provaData}>
@@ -388,32 +388,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    paddingTop: 40,
-  },
-  title: {
-    fontSize: 24,
-    fontFamily: 'Poppins-Bold',
-    color: '#2F4FCD',
-  },
-  addButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#DDDBFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    // Estilo neomorphism
-    shadowColor: '#BBBADD',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5,
   },
   emptyContainer: {
     flex: 1,
@@ -582,5 +556,11 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: '#CCCCCC',
+  },
+  thumbnail: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    marginRight: 10,
   },
 });

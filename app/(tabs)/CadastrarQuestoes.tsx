@@ -5,6 +5,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
+import { Feather } from '@expo/vector-icons';
+import HeaderPadrao from '../../components/HeaderPadrao';
 
 interface Prova {
   id: string;
@@ -124,6 +126,7 @@ export default function CadastrarQuestoes() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      <HeaderPadrao title="Cadastrar Gabarito" />
       <Text style={styles.label}>Nome da Prova:</Text>
       <TextInput
         style={styles.input}
@@ -168,9 +171,20 @@ export default function CadastrarQuestoes() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#f0f0ff',
+    backgroundColor: '#ffff',
     padding: 20,
     alignItems: 'stretch',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#6A0DAD',
+    flex: 1,
   },
   label: {
     fontSize: 16,

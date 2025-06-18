@@ -23,6 +23,7 @@ import {
   useCameraPermissions
 } from 'expo-camera';
 import { useRouter } from 'expo-router';
+import HeaderPadrao from '../../components/HeaderPadrao';
 
 // Interface para tipagem das provas
 interface Prova {
@@ -330,12 +331,6 @@ export default function ScanScreen() {
           responsiveOrientationWhenOrientationLocked
         >
           <View style={styles.cameraHeader}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={resetarFluxo}
-            >
-              <Feather name="arrow-left" size={24} color="#FFF" />
-            </TouchableOpacity>
             <View style={styles.cameraHeaderInfo}>
               <Text style={styles.cameraHeaderTitle}>
                 {provaSelecionada?.nome}
@@ -389,7 +384,8 @@ export default function ScanScreen() {
   
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style={showCamera || capturedImage ? "light" : "dark"} />
+      <StatusBar style="dark" />
+      <HeaderPadrao title="Scanner de Provas" />
       
       {renderModalProva()}
       {renderModalAluno()}
@@ -563,15 +559,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     zIndex: 10,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
   },
   cameraHeaderInfo: {
     flex: 1,
@@ -762,5 +749,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Poppins-Medium',
     marginTop: 10,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-Bold',
+    color: '#2F4FCD',
+    marginLeft: 10,
   },
 });

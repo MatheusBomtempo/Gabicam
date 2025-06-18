@@ -22,6 +22,7 @@ import { Picker } from '@react-native-picker/picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
+import HeaderPadrao from '../../components/HeaderPadrao';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -279,7 +280,7 @@ export default function CameraProvaScreen() {
         const provasData: Prova[] = JSON.parse(provasArmazenadas);
         const provasAtualizadas = provasData.map(p => {
           if (p.id === selectedProvaId) {
-            p.fotos = [...(p.fotos || []), novaImagem.id];
+            p.fotos = [...(p.fotos || []), imageUri]; // Salva o caminho real da imagem
           }
           return p;
         });
@@ -426,14 +427,10 @@ export default function CameraProvaScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={24} color="#2F4FCD" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Capturar Prova</Text>
-        <View style={{ width: 24 }} />
-      </View>
-      {renderFormulario()}
+      <HeaderPadrao title="Tirar Foto" />
+      <ScrollView contentContainerStyle={styles.content}>
+        {renderFormulario()}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -647,5 +644,8 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         marginLeft: 8,
+    },
+    content: {
+        padding: 20,
     },
 });
