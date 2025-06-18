@@ -1,4 +1,4 @@
-# Bem-vindo ao GabiCam 👋
+# Bem-vindo ao GabiCam
 
 Este é um projeto [Expo](https://expo.dev) criado com [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
@@ -16,6 +16,58 @@ O **GabiCam** é um aplicativo React Native para capturar, corrigir e gerenciar 
 - **Fluxo completo de correção**: Crie provas, cadastre gabaritos, capture fotos, corrija automaticamente e visualize resultados, tudo em poucos toques.
 - **Configurações avançadas**: Limpe provas, imagens ou todos os dados do app facilmente pela tela de configurações.
 - **Interface moderna**: Ícones, cores e fontes padronizadas para uma experiência agradável.
+
+---
+
+## Características Técnicas
+
+- **React Native + Expo**: Projeto criado com Expo, facilitando o desenvolvimento multiplataforma (Android, iOS e Web).
+- **Roteamento por arquivos**: Utiliza o Expo Router para navegação baseada em arquivos.
+- **Persistência local**: Usa AsyncStorage para dados estruturados e Expo FileSystem para imagens.
+- **OCR via API externa**: O reconhecimento das respostas é feito por uma API de OCR customizada.
+- **Componentização**: Telas e componentes reutilizáveis, como o HeaderPadrao.
+- **Estilo e UI**: Utiliza StyleSheet do React Native, ícones Feather e LinearGradient para visuais modernos.
+- **Sem dependências de nuvem**: Não utiliza Firebase, Google Cloud ou outros serviços externos para autenticação ou storage.
+- **Pronto para integração futura**: Resultados podem ser salvos na nuvem para exportação em Excel ou visualização em dashboards.
+
+---
+
+## URLs e Endpoints para Configuração
+
+Para que o app funcione corretamente, você deve configurar a URL da API de correção OCR. Procure pelas seguintes linhas nos arquivos de tela:
+
+```typescript
+const API_URL = 'http://sua-url-api:5000/corrigir';
+```
+
+**Arquivos onde você deve alterar a URL:**
+- `app/(tabs)/CorrecaoScreen.tsx`
+- `app/(tabs)/TesteScreen.tsx`
+- (Se houver outros arquivos que usam OCR, procure por `API_URL`)
+
+**O que a API deve aceitar:**
+- Receber uma imagem (formato JPEG recomendado) e o gabarito da prova.
+- Retornar um JSON com os campos: `acertos`, `total`, `nota`, `respostas_detectadas`.
+
+**Exemplo de payload enviado:**
+```json
+{
+  "imagem": <arquivo>,
+  "gabarito": "ABCDEABCDE"
+}
+```
+
+**Exemplo de resposta esperada:**
+```json
+{
+  "acertos": 8,
+  "total": 10,
+  "nota": 8.0,
+  "respostas_detectadas": ["A", "B", "C", ...]
+}
+```
+
+Se você quiser salvar resultados na nuvem futuramente, basta implementar endpoints adicionais na sua API e adaptar as funções de salvamento do app.
 
 ---
 
@@ -48,25 +100,6 @@ O **GabiCam** é um aplicativo React Native para capturar, corrigir e gerenciar 
 
 ---
 
-## Exemplos Visuais (Fluxo)
-
-```
-[Login fictício]
-   ↓
-[Tela Inicial]
- ┌─────────────┬─────────────┐
- │ Criar Prova │ Tirar Foto  │
- ├─────────────┼─────────────┤
- │ Corrigir    │ Configurações│
- │ Provas      │             │
- └─────────────┴─────────────┘
-   ↓
-[Fluxo de Prova]
-   - Criar Prova → Cadastrar Gabarito → Capturar Foto → Corrigir → Visualizar Resultados
-```
-
----
-
 ## Funcionalidades Detalhadas
 
 - **Criação de Provas**: Crie quantas provas quiser, cada uma com seu próprio gabarito.
@@ -91,18 +124,6 @@ O **GabiCam** é um aplicativo React Native para capturar, corrigir e gerenciar 
 
 ---
 
-## Configuração da API de Correção
-
-O aplicativo se conecta a uma API de OCR para correção automática. Atualize a URL da API nos arquivos de tela relevantes:
-
-```typescript
-const API_URL = 'http://sua-url-api:5000/corrigir';
-```
-
-A API deve receber uma imagem e um gabarito, e retornar os acertos, nota e respostas detectadas.
-
----
-
 ## FAQ
 
 **1. Preciso de internet para usar o app?**
@@ -121,4 +142,3 @@ A API deve receber uma imagem e um gabarito, e retornar os acertos, nota e respo
 - Use a tela de configurações para limpar provas, imagens ou todos os dados do app.
 
 ---
-
