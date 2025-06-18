@@ -140,3 +140,45 @@ Se você quiser salvar resultados na nuvem futuramente, basta implementar endpoi
 - Use a tela de configurações para limpar provas, imagens ou todos os dados do app.
 
 ---
+
+## Como Iniciar o Projeto
+
+### 1. Iniciar o App Mobile (Expo)
+
+No diretório raiz do projeto, execute:
+```bash
+npm install
+npx expo start
+```
+- Use o QR Code para abrir no seu dispositivo com o Expo Go, ou escolha rodar no emulador Android/iOS.
+
+### 2. Iniciar o Backend Node.js (Server)
+
+Se o projeto possuir um backend Node.js (por exemplo, para autenticação, provas, etc), acesse a pasta `server` e rode:
+```bash
+cd server
+npm install
+npm start
+```
+- O servidor geralmente roda em `http://localhost:5000` ou porta definida no código.
+
+### 3. Iniciar a API Flask (OCR - app.py)
+
+Se você utiliza uma API Flask para OCR, acesse a pasta onde está o `app.py` e rode:
+```bash
+cd <gabarito-ocr>
+# (Recomenda-se usar um ambiente virtual Python)
+# python -m venv venv
+# source venv/bin/activate  (Linux/macOS)
+# venv\Scripts\activate  (Windows)
+pip install -r requirements.txt
+python app.py
+```
+- Por padrão, a API Flask roda em `http://localhost:5000` ou na porta definida em `app.py`.
+- Certifique-se de que a porta da API Flask não conflita com a do backend Node.js.
+
+### 4. Configurar URLs no App
+
+No código do app, altere as variáveis `API_URL` para apontar para o endereço correto da sua API Flask (OCR) e, se necessário, do backend Node.js.
+
+---
