@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert, StyleSheet, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../contexts/AuthContext';
+import api from '../../services/api';
 
 interface Prova {
   id: string;
@@ -17,8 +19,10 @@ const STORAGE_KEY = '@GabaritoApp:provas';
 export default function CadastrarQuestoes() {
   const { provaId } = useLocalSearchParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [respostas, setRespostas] = useState(Array(10).fill('A'));
   const [nomeProva, setNomeProva] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const opcoes = ['A', 'B', 'C', 'D', 'E'];
 
   useEffect(() => {
@@ -57,9 +61,21 @@ export default function CadastrarQuestoes() {
       Alert.alert('Erro', 'Digite o nome da prova.');
       return;
     }
-  
+
+    if (!user) {
+      Alert.alert('Erro', 'Usuário não autenticado');
+      return;
+    }
+
+    setIsSaving(true);
     try {
-      // Carrega as provas existentes
+      // Salvar no banco de dados
+      await api.put(`/api/provas/atualizar-gabarito/${provaId}`, {
+        nome: nomeProva.trim(),
+        gabarito: respostas
+      });
+
+      // Atualizar também no armazenamento local para compatibilidade
       const provasArmazenadas = await AsyncStorage.getItem(STORAGE_KEY);
       let provas: Prova[] = [];
       
@@ -67,19 +83,17 @@ export default function CadastrarQuestoes() {
         provas = JSON.parse(provasArmazenadas);
       }
 
-      // Atualiza a prova específica com o gabarito
       const provasAtualizadas = provas.map(prova => {
         if (prova.id === provaId) {
           return {
             ...prova,
-            nome: nomeProva,
+            nome: nomeProva.trim(),
             gabarito: respostas
           };
         }
         return prova;
       });
 
-      // Salva as provas atualizadas
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(provasAtualizadas));
       
       Alert.alert(
@@ -92,9 +106,19 @@ export default function CadastrarQuestoes() {
           }
         ]
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar gabarito:', error);
-      Alert.alert('Erro', 'Não foi possível salvar o gabarito');
+      let errorMessage = 'Não foi possível salvar o gabarito.';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Erro', errorMessage);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -127,8 +151,16 @@ export default function CadastrarQuestoes() {
         </View>
       ))}
 
-      <TouchableOpacity style={styles.button} onPress={salvarGabarito}>
-        <Text style={styles.buttonText}>Salvar Gabarito</Text>
+      <TouchableOpacity 
+        style={[styles.button, isSaving && styles.buttonDisabled]} 
+        onPress={salvarGabarito}
+        disabled={isSaving}
+      >
+        {isSaving ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <Text style={styles.buttonText}>Salvar Gabarito</Text>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -192,5 +224,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  buttonDisabled: {
+    backgroundColor: '#ccc',
   },
 });

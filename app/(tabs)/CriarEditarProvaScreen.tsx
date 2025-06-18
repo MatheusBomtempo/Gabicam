@@ -13,8 +13,10 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../contexts/AuthContext';
+import api from '../../services/api';
 
 // Interface para tipagem das provas
 interface Prova {
@@ -33,6 +35,9 @@ export default function CriarEditarProvaScreen() {
   const [actionMenuVisible, setActionMenuVisible] = useState<string | null>(null);
   const [novaProva, setNovaProva] = useState('');
   const [provaEmEdicao, setProvaEmEdicao] = useState<Prova | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const { user } = useAuth();
+  const router = useRouter();
 
   // Carregar provas do AsyncStorage quando o componente montar
   useEffect(() => {
@@ -69,18 +74,57 @@ export default function CriarEditarProvaScreen() {
       return;
     }
 
-    const novaProvaObj: Prova = {
-      id: Date.now().toString(),
-      nome: novaProva,
-      dataCriacao: new Date().toLocaleDateString('pt-BR'),
-      fotos: [],
-    };
+    if (!user) {
+      Alert.alert('Erro', 'Usuário não autenticado');
+      return;
+    }
 
-    const provasAtualizadas = [...provas, novaProvaObj];
-    setProvas(provasAtualizadas);
-    await salvarProvas(provasAtualizadas);
-    setNovaProva('');
-    setModalVisible(false);
+    setIsCreating(true);
+    try {
+      // Criar prova no banco de dados
+      const response = await api.post('/api/provas/criar-prova', {
+        nome: novaProva.trim(),
+        gabarito: null // Será definido posteriormente na tela de gabarito
+      });
+
+      const provaCriada = response.data.prova;
+      
+      // Criar objeto para armazenamento local
+      const novaProvaObj: Prova = {
+        id: provaCriada.id.toString(),
+        nome: provaCriada.nome,
+        dataCriacao: new Date(provaCriada.data_criacao).toLocaleDateString('pt-BR'),
+        fotos: [],
+      };
+
+      // Atualizar estado local
+      const provasAtualizadas = [...provas, novaProvaObj];
+      setProvas(provasAtualizadas);
+      await salvarProvas(provasAtualizadas);
+      
+      setNovaProva('');
+      setModalVisible(false);
+      
+      // Redirecionar automaticamente para a tela de criar gabarito
+      router.push({
+        pathname: '/CadastrarQuestoes',
+        params: { provaId: provaCriada.id.toString() }
+      });
+      
+    } catch (error: any) {
+      console.error('Erro ao criar prova:', error);
+      let errorMessage = 'Não foi possível criar a prova.';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Erro', errorMessage);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   // Função para renomear uma prova
@@ -111,10 +155,29 @@ export default function CriarEditarProvaScreen() {
         text: 'Excluir',
         style: 'destructive',
         onPress: async () => {
-          const provasAtualizadas = provas.filter((p) => p.id !== id);
-          setProvas(provasAtualizadas);
-          await salvarProvas(provasAtualizadas);
-          setActionMenuVisible(null);
+          try {
+            // Deletar do banco de dados
+            await api.delete(`/api/provas/deletar-prova/${id}`);
+            
+            // Remover do armazenamento local
+            const provasAtualizadas = provas.filter((p) => p.id !== id);
+            setProvas(provasAtualizadas);
+            await salvarProvas(provasAtualizadas);
+            setActionMenuVisible(null);
+            
+            Alert.alert('Sucesso', 'Prova excluída com sucesso!');
+          } catch (error: any) {
+            console.error('Erro ao deletar prova:', error);
+            let errorMessage = 'Não foi possível excluir a prova.';
+            
+            if (error.response?.data?.error) {
+              errorMessage = error.response.data.error;
+            } else if (error.message) {
+              errorMessage = error.message;
+            }
+            
+            Alert.alert('Erro', errorMessage);
+          }
         },
       },
     ]);
@@ -228,7 +291,7 @@ export default function CriarEditarProvaScreen() {
         animationType="fade"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => !isCreating && setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -240,24 +303,33 @@ export default function CriarEditarProvaScreen() {
               value={novaProva}
               onChangeText={setNovaProva}
               autoFocus
+              editable={!isCreating}
             />
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
-                  setNovaProva('');
-                  setModalVisible(false);
+                  if (!isCreating) {
+                    setNovaProva('');
+                    setModalVisible(false);
+                  }
                 }}
+                disabled={isCreating}
               >
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
+                style={[styles.modalButton, styles.confirmButton, isCreating && styles.disabledButton]}
                 onPress={criarNovaProva}
+                disabled={isCreating}
               >
-                <Text style={styles.confirmButtonText}>Criar</Text>
+                {isCreating ? (
+                  <Text style={styles.confirmButtonText}>Criando...</Text>
+                ) : (
+                  <Text style={styles.confirmButtonText}>Criar</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -507,5 +579,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontFamily: 'Poppins-Medium',
+  },
+  disabledButton: {
+    backgroundColor: '#CCCCCC',
   },
 });

@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./routes/auth');
+const provasRoutes = require('./routes/provas');
 
 console.log('🚀 Iniciando servidor...');
 
@@ -25,6 +26,7 @@ app.use((req, res, next) => {
 
 // Rotas
 app.use('/api', authRoutes);
+app.use('/api/provas', provasRoutes);
 
 // Rota de teste
 app.get('/test', (req, res) => {

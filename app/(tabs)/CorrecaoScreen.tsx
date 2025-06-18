@@ -17,6 +17,8 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { useAuth } from '../../contexts/AuthContext';
+import api from '../../services/api';
 
 interface Prova {
   id: string;
@@ -61,7 +63,10 @@ export default function CorrecaoScreen() {
   const [pastas, setPastas] = useState<PastaProva[]>([]);
   const [pastaSelecionada, setPastaSelecionada] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [ultimaSalvamento, setUltimaSalvamento] = useState<string | null>(null);
   const router = useRouter();
+  const { user } = useAuth();
   
   useEffect(() => {
     // Criar diretório para imagens normalizadas se não existir
@@ -379,6 +384,20 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
     );
   };
 
+  const carregarUltimoSalvamento = async (provaId: string) => {
+    try {
+      const response = await api.get(`/api/provas/ultimo-salvamento/${provaId}`);
+      if (response.data.ultimoSalvamento) {
+        setUltimaSalvamento(response.data.ultimoSalvamento);
+      } else {
+        setUltimaSalvamento(null);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar último salvamento:', error);
+      setUltimaSalvamento(null);
+    }
+  };
+
   const renderPasta = ({ item }: { item: PastaProva }) => {
     // Contar provas por status
     const provasPendentes = item.provas.filter(p => p.status === 'pendente').length;
@@ -388,7 +407,10 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
     return (
       <TouchableOpacity 
         style={styles.pastaCard}
-        onPress={() => setPastaSelecionada(item.id)}
+        onPress={() => {
+          setPastaSelecionada(item.id);
+          carregarUltimoSalvamento(item.id);
+        }}
       >
         <View style={styles.pastaContent}>
           <View style={styles.pastaIconContainer}>
@@ -426,19 +448,93 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
     );
   };
 
+  const salvarResultados = async () => {
+    if (!pastaSelecionada) return;
+
+    const pastaAtual = pastas.find(p => p.id === pastaSelecionada);
+    if (!pastaAtual) return;
+
+    // Filtrar apenas provas corrigidas
+    const provasCorrigidas = pastaAtual.provas.filter(p => p.status === 'corrigido' && p.resultado);
+    
+    if (provasCorrigidas.length === 0) {
+      Alert.alert('Atenção', 'Não há provas corrigidas para salvar.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const resultados = provasCorrigidas.map(prova => ({
+        nomeAluno: prova.nomeAluno,
+        acertos: prova.resultado?.acertos || 0,
+        total: prova.resultado?.total || 0,
+        nota: prova.resultado?.nota || 0
+      }));
+
+      await api.post('/api/provas/salvar-resultados', {
+        provaId: pastaSelecionada,
+        resultados
+      });
+
+      // Atualizar a data de último salvamento
+      setUltimaSalvamento(new Date().toISOString());
+      
+      Alert.alert('Sucesso', 'Resultados salvos com sucesso!');
+    } catch (error: unknown) {
+      console.error('Erro ao salvar resultados:', error);
+      let errorMessage = 'Não foi possível salvar os resultados.';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'response' in error) {
+        const axiosError = error as { response?: { data?: { error?: string } } };
+        errorMessage = axiosError.response?.data?.error || errorMessage;
+      }
+      
+      Alert.alert('Erro', errorMessage);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const renderHeader = () => (
     <View style={styles.header}>
       <Text style={styles.title}>
         {pastaSelecionada ? 'Provas para Correção' : 'Pastas de Provas'}
       </Text>
       {pastaSelecionada && (
-        <TouchableOpacity 
-          style={styles.voltarButton}
-          onPress={() => setPastaSelecionada(null)}
-        >
-          <Feather name="arrow-left" size={24} color="#2F4FCD" />
-          <Text style={styles.voltarText}>Voltar</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity 
+            style={styles.voltarButton}
+            onPress={() => setPastaSelecionada(null)}
+          >
+            <Feather name="arrow-left" size={24} color="#2F4FCD" />
+            <Text style={styles.voltarText}>Voltar</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.salvarContainer}>
+            <TouchableOpacity 
+              style={[styles.salvarButton, isSaving && styles.salvarButtonDisabled]}
+              onPress={salvarResultados}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Feather name="save" size={20} color="#FFFFFF" />
+                  <Text style={styles.salvarButtonText}>Salvar Resultados</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            
+            {ultimaSalvamento && (
+              <Text style={styles.ultimaSalvamentoText}>
+                Último salvamento: {new Date(ultimaSalvamento).toLocaleString('pt-BR')}
+              </Text>
+            )}
+          </View>
+        </View>
       )}
     </View>
   );
@@ -790,5 +886,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Poppins-Medium',
     color: '#666',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  salvarContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+  },
+  salvarButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#27AE60',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginLeft: 10,
+  },
+  salvarButtonDisabled: {
+    opacity: 0.7,
+  },
+  salvarButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+    marginLeft: 8,
+  },
+  ultimaSalvamentoText: {
+    color: '#999',
+    fontSize: 11,
+    fontFamily: 'Poppins-Regular',
+    marginTop: 4,
+    marginRight: 10,
   },
 });

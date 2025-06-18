@@ -11,16 +11,43 @@ npm install
 
 2. Configure o banco de dados MySQL:
 - Crie um banco de dados chamado `gabicam_db`
-- Execute o seguinte SQL para criar a tabela de usuários:
+- Execute o seguinte SQL para criar as tabelas:
 
 ```sql
-CREATE TABLE usuarios (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  matricula VARCHAR(20) UNIQUE NOT NULL,
-  nome VARCHAR(100) NOT NULL,
-  senha VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE DATABASE IF NOT EXISTS gabicam_db;
+USE gabicam_db;
+
+CREATE TABLE IF NOT EXISTS usuarios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    matricula VARCHAR(20) UNIQUE NOT NULL,
+    senha VARCHAR(255) NOT NULL,
+    nome VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS provas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    nome VARCHAR(100) NOT NULL,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    gabarito JSON,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS imagens_provas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    prova_id INT NOT NULL,
+    usuario_id INT NOT NULL,
+    nome_aluno VARCHAR(100) NOT NULL,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('pendente', 'em_analise', 'corrigido') DEFAULT 'pendente',
+    acertos INT DEFAULT 0,
+    total_questoes INT DEFAULT 0,
+    nota DECIMAL(4,2) DEFAULT 0.00,
+    FOREIGN KEY (prova_id) REFERENCES provas(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+); 
 ```
 
 3. Configure as variáveis de ambiente:
@@ -57,6 +84,12 @@ npm start
 #### Cadastro
 - POST `/api/cadastro`
 - Body: `{ "matricula": "string", "nome": "string", "senha": "string" }`
+
+### Provas
+
+#### Salvar Resultados
+- POST `/api/provas/salvar-resultados`
+- Body: `{ "provaId": "string", "resultados": [{ "nomeAluno": "string", "acertos": number, "total": number, "nota": number }] }`
 
 ### Teste
 - GET `/test`
