@@ -8,11 +8,9 @@ O **GabiCam** é um aplicativo React Native para capturar, corrigir e gerenciar 
 
 ## Novidades e Características
 
-- **Login fictício**: Não é necessário autenticação real. Ideal para testes, demonstrações e uso offline.
-- **Header padronizado**: Todas as telas possuem um cabeçalho unificado, com botão de voltar e título centralizado, garantindo navegação intuitiva.
+- **Login**: Login com funcionamento rapido e facil com entrada com matricula e senha criptografada.
 - **Thumbnails persistentes**: As miniaturas das provas são salvas e exibidas corretamente mesmo após fechar e reabrir o app.
 - **Gerenciamento local**: Todo o armazenamento de provas, imagens e resultados é feito localmente usando AsyncStorage e FileSystem, sem dependência de nuvem.
-- **Sem Firebase**: O app é totalmente independente de serviços externos, tornando-o mais leve e fácil de manter.
 - **Fluxo completo de correção**: Crie provas, cadastre gabaritos, capture fotos, corrija automaticamente e visualize resultados, tudo em poucos toques.
 - **Configurações avançadas**: Limpe provas, imagens ou todos os dados do app facilmente pela tela de configurações.
 - **Interface moderna**: Ícones, cores e fontes padronizadas para uma experiência agradável.
