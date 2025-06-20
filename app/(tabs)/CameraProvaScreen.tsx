@@ -51,7 +51,7 @@ interface ImagemCapturada {
 
 const PROVAS_STORAGE_KEY = '@GabaritoApp:provas';
 const IMAGENS_STORAGE_KEY = '@GabaritoApp:imagens';
-const NORMALIZED_IMAGES_DIR = `${FileSystem.cacheDirectory}normalized_images/`;
+const NORMALIZED_IMAGES_DIR = `${FileSystem.documentDirectory}normalized_images/`;
 
 export default function CameraProvaScreen() {
   // Unificando a verificação de permissões

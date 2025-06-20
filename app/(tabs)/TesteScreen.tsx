@@ -23,7 +23,7 @@ const API_URL = Platform.OS === 'android'
   : 'http://localhost:5000/corrigir';
 
 // Diretório para salvar as imagens normalizadas
-const NORMALIZED_IMAGES_DIR = `${FileSystem.cacheDirectory}normalized_images/`;
+const NORMALIZED_IMAGES_DIR = `${FileSystem.documentDirectory}normalized_images/`;
 
 export default function TesteScreen() {
   const [isLoading, setIsLoading] = useState(false);

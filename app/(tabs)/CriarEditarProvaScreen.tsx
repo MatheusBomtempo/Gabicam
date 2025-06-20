@@ -216,19 +216,13 @@ export default function CriarEditarProvaScreen() {
                 }}
               >
                 <View style={styles.provaInfo}>
-                  {item.fotos && item.fotos.length > 0 ? (
-                    <Image
-                      source={{ uri: item.fotos[0] }}
-                      style={styles.thumbnail}
-                    />
-                  ) : (
+                  
                     <Feather
                       name="file-text"
-                      size={24}
+                      size={29}
                       color="#2F4FCD"
                       style={styles.provaIcon}
                     />
-                  )}
                   <View>
                     <Text style={styles.provaNome}>{item.nome}</Text>
                     <Text style={styles.provaData}>

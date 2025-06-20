@@ -56,7 +56,7 @@ const PROVAS_STORAGE_KEY = '@GabaritoApp:provas';
 const IMAGENS_STORAGE_KEY = '@GabaritoApp:imagens';
 const API_URL = 'http://192.168.2.103:5000/corrigir';
 // Diretório para salvar as imagens normalizadas
-const NORMALIZED_IMAGES_DIR = `${FileSystem.cacheDirectory}normalized_images/`;
+const NORMALIZED_IMAGES_DIR = `${FileSystem.documentDirectory}normalized_images/`;
 
 export default function CorrecaoScreen() {
   const [imagens, setImagens] = useState<ImagemCapturada[]>([]);
@@ -66,6 +66,8 @@ export default function CorrecaoScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [ultimaSalvamento, setUltimaSalvamento] = useState<string | null>(null);
+  const [modoSelecao, setModoSelecao] = useState(false);
+  const [selecionadas, setSelecionadas] = useState<string[]>([]);
   const router = useRouter();
   const { user } = useAuth();
   
@@ -512,9 +514,15 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
         <View style={styles.content}>
           {pastaSelecionada ? (
             <View style={styles.pastaSelecionadaContainer}>
-              <View style={styles.pastaHeader}>
-                <View style={{ width: 50 }} />
-                <View style={{ flex: 1 }} />
+              <View style={styles.pastaHeaderRow}>
+                <TouchableOpacity 
+                  style={[styles.removerButton, modoSelecao && styles.removerButtonAtivo]}
+                  onPress={() => setModoSelecao(!modoSelecao)}
+                  disabled={isSaving}
+                >
+                  <Feather name="trash-2" size={20} color="#FFFFFF" />
+                  <Text style={styles.removerButtonText}>{modoSelecao ? 'Cancelar' : 'Remover'}</Text>
+                </TouchableOpacity>
                 <View style={styles.salvarColuna}>
                   <TouchableOpacity 
                     style={[styles.salvarButton, isSaving && styles.salvarButtonDisabled]}
@@ -538,16 +546,69 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
                 </View>
               </View>
               
+              {modoSelecao && selecionadas.length > 0 && (
+                <TouchableOpacity
+                  style={styles.excluirSelecionadasButton}
+                  onPress={async () => {
+                    Alert.alert(
+                      'Excluir provas',
+                      `Tem certeza que deseja excluir ${selecionadas.length} prova(s)?`,
+                      [
+                        { text: 'Cancelar', style: 'cancel' },
+                        { text: 'Excluir', style: 'destructive', onPress: async () => {
+                          const pastaAtual = pastas.find(p => p.id === pastaSelecionada);
+                          if (!pastaAtual) return;
+                          const novasProvas = pastaAtual.provas.filter(p => !selecionadas.includes(p.id));
+                          const novasImagens = imagens.filter(img => !selecionadas.includes(img.id));
+                          setImagens(novasImagens);
+                          await salvarImagens(novasImagens);
+                          // Atualizar o array de fotos da prova correspondente
+                          const provasAtualizadas = provas.map(prova => {
+                            if (prova.id === pastaSelecionada) {
+                              // Remove as fotos das imagens excluídas
+                              const fotosRestantes = novasImagens.filter(img => img.provaId === prova.id).map(img => img.imageUri);
+                              return { ...prova, fotos: fotosRestantes };
+                            }
+                            return prova;
+                          });
+                          setProvas(provasAtualizadas);
+                          await AsyncStorage.setItem(PROVAS_STORAGE_KEY, JSON.stringify(provasAtualizadas));
+                          setSelecionadas([]);
+                          setModoSelecao(false);
+                        }}
+                      ]
+                    );
+                  }}
+                >
+                  <Feather name="trash-2" size={18} color="#fff" />
+                  <Text style={styles.excluirSelecionadasText}>Excluir selecionadas</Text>
+                </TouchableOpacity>
+              )}
+              
               <FlatList
                 data={pastas.find(p => p.id === pastaSelecionada)?.provas || []}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                   <TouchableOpacity 
                     style={styles.imagemCard}
-                    onPress={() => iniciarCorrecao(item)}
+                    onPress={() => modoSelecao ? (
+                      setSelecionadas(sel => sel.includes(item.id) ? sel.filter(id => id !== item.id) : [...sel, item.id])
+                    ) : iniciarCorrecao(item)}
                     disabled={item.status === 'em_analise'}
                   >
                     <View style={styles.cardContent}>
+                      {modoSelecao && (
+                        <TouchableOpacity
+                          style={styles.checkbox}
+                          onPress={() => setSelecionadas(sel => sel.includes(item.id) ? sel.filter(id => id !== item.id) : [...sel, item.id])}
+                        >
+                          {selecionadas.includes(item.id) ? (
+                            <Feather name="check-square" size={24} color="#2F4FCD" />
+                          ) : (
+                            <Feather name="square" size={24} color="#BBBADD" />
+                          )}
+                        </TouchableOpacity>
+                      )}
                       <Image 
                         source={{ uri: item.imageUri }}
                         style={styles.thumbnail}
@@ -672,9 +733,9 @@ const styles = StyleSheet.create({
   pastaSelecionadaContainer: {
     flex: 1,
   },
-  pastaHeader: {
+  pastaHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     padding: 10,
   },
@@ -867,5 +928,41 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 20,
+  },
+  removerButton: {
+    backgroundColor: '#F44336',
+    padding: 10,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  removerButtonAtivo: {
+    backgroundColor: '#B71C1C',
+  },
+  removerButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    marginLeft: 10,
+  },
+  excluirSelecionadasButton: {
+    backgroundColor: '#F44336',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    borderRadius: 8,
+    margin: 10,
+  },
+  excluirSelecionadasText: {
+    color: '#fff',
+    fontSize: 15,
+    fontFamily: 'Poppins-Bold',
+    marginLeft: 8,
+  },
+  checkbox: {
+    marginRight: 10,
   },
 });
