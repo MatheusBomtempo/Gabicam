@@ -16,7 +16,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 
-
 const { width } = Dimensions.get('window');
 
 export default function Home() {
@@ -35,23 +34,26 @@ export default function Home() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       
+      {/* Background Gradient */}
+      <LinearGradient
+        colors={['rgba(47, 79, 205, 0.05)', 'rgba(47, 79, 205, 0.02)', 'transparent']}
+        locations={[0, 0.3, 1]}
+        style={styles.backgroundGradient}
+      />
+      
       <View style={styles.header}>
-        <Text style={styles.logo}>GabiCam</Text>
+        <View style={styles.logoContainer}>
+          <Text style={styles.logo}>GabiCam</Text>
+        </View>
         <TouchableOpacity
           style={styles.logoutButton}
           onPress={handleSignOut}
         >
-          <Feather name="log-out" size={24} color="#2F4FCD" />
+          <View style={styles.logoutIconContainer}>
+            <Feather name="log-out" size={20} color="#2F4FCD" />
+          </View>
         </TouchableOpacity>
       </View>
-      
-      {/* <View style={styles.imageContainer}>
-        <Image 
-          source={require('../../assets/images/correction.jpg')} 
-          style={styles.image}
-          resizeMode="contain"
-        />
-      </View> */}
       
       <View style={styles.infoContainer}>
         <Text style={styles.title}>Corrija provas facilmente</Text>
@@ -65,20 +67,26 @@ export default function Home() {
         <TouchableOpacity 
           style={styles.mainButton}
           onPress={() => router.push('/CriarEditarProvaScreen')}
+          activeOpacity={0.8}
         >
           <LinearGradient
-            colors={['#3B5EDE', '#2F4FCD']}
-            style={styles.mainButtonGradient}
+            colors={['#f8f9ff', '#f0f2ff']}
+            style={styles.mainButtonBase}
           >
-            <View style={styles.mainButtonContent}>
-              <View style={styles.mainIconContainer}>
-                <Feather name="file-text" size={36} color="#2F4FCD" />
+            <LinearGradient
+              colors={['rgba(47, 79, 205, 0.8)', 'rgba(47, 79, 205, 0.6)']}
+              style={styles.mainButtonGradient}
+            >
+              <View style={styles.mainButtonContent}>
+                <View style={styles.mainIconContainer}>
+                  <Feather name="file-text" size={28} color="#2F4FCD" />
+                </View>
+                <View style={styles.mainTextContainer}>
+                  <Text style={styles.mainButtonText}>Criar Prova</Text>
+                  <Text style={styles.mainButtonSubtext}>Primeiro passo</Text>
+                </View>
               </View>
-              <View style={styles.mainTextContainer}>
-                <Text style={styles.mainButtonText}>Criar Prova</Text>
-                <Text style={styles.mainButtonSubtext}>Primeiro passo</Text>
-              </View>
-            </View>
+            </LinearGradient>
           </LinearGradient>
         </TouchableOpacity>
 
@@ -86,39 +94,57 @@ export default function Home() {
         <TouchableOpacity 
           style={styles.actionButton}
           onPress={() => router.push('/CameraProvaScreen')}
+          activeOpacity={0.8}
         >
-          <View style={styles.actionButtonContent}>
-            <View style={styles.actionIconContainer}>
-              <Feather name="camera" size={32} color="#2F4FCD" />
+          <LinearGradient
+            colors={['#ffffff', '#f8f9ff']}
+            style={styles.actionButtonGradient}
+          >
+            <View style={styles.actionButtonContent}>
+              <View style={styles.actionIconContainer}>
+                <Feather name="camera" size={24} color="#2F4FCD" />
+              </View>
+              <Text style={styles.actionButtonText}>Tirar Foto</Text>
             </View>
-            <Text style={styles.actionButtonText}>Tirar Foto</Text>
-          </View>
+          </LinearGradient>
         </TouchableOpacity>
 
         {/* Corrigir Provas - Ação Principal */}
         <TouchableOpacity 
           style={styles.actionButton}
           onPress={() => router.push('/CorrecaoScreen')}
+          activeOpacity={0.8}
         >
-          <View style={styles.actionButtonContent}>
-            <View style={styles.actionIconContainer}>
-              <Feather name="check-circle" size={32} color="#2F4FCD" />
+          <LinearGradient
+            colors={['#ffffff', '#f8f9ff']}
+            style={styles.actionButtonGradient}
+          >
+            <View style={styles.actionButtonContent}>
+              <View style={styles.actionIconContainer}>
+                <Feather name="check-circle" size={24} color="#2F4FCD" />
+              </View>
+              <Text style={styles.actionButtonText}>Corrigir Provas</Text>
             </View>
-            <Text style={styles.actionButtonText}>Corrigir Provas</Text>
-          </View>
+          </LinearGradient>
         </TouchableOpacity>
 
         {/* Configurações - Funcionalidade Isolada */}
         <TouchableOpacity 
           style={styles.settingsButton}
           onPress={() => router.push('/ConfiguracoesScreen')}
+          activeOpacity={0.8}
         >
-          <View style={styles.settingsButtonContent}>
-            <View style={styles.settingsIconContainer}>
-              <Feather name="settings" size={28} color="#666" />
+          <LinearGradient
+            colors={['#fafafa', '#f5f5f7']}
+            style={styles.settingsButtonGradient}
+          >
+            <View style={styles.settingsButtonContent}>
+              <View style={styles.settingsIconContainer}>
+                <Feather name="settings" size={22} color="#666" />
+              </View>
+              <Text style={styles.settingsButtonText}>Configurações</Text>
             </View>
-            <Text style={styles.settingsButtonText}>Configurações</Text>
-          </View>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -128,8 +154,15 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#f8f9ff',
     paddingHorizontal: 20,
+  },
+  backgroundGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
   },
   header: {
     flexDirection: 'row',
@@ -139,32 +172,51 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingBottom: 15,
   },
+  logoContainer: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    shadowColor: '#2F4FCD',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
   logo: {
+    fontSize: 20,
+    fontFamily: 'System',
+    fontWeight: '800',
+    color: '#2F4FCD',
+  },
+  logoutButton: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    shadowColor: '#2F4FCD',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  logoutIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoContainer: {
+    alignItems: 'center',
+    marginVertical: 30,
+    paddingHorizontal: 10,
+  },
+  title: {
     fontSize: 24,
     fontFamily: 'System',
     fontWeight: '700',
     color: '#2F4FCD',
-  },
-  imageContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 20,
-  },
-  image: {
-    width: width * 0.8,
-    height: width * 0.8,
-  },
-  infoContainer: {
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  title: {
-    fontSize: 22,
-    fontFamily: 'System',
-    fontWeight: '700',
-    color: '#2F4FCD',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   subtitle: {
     fontSize: 16,
@@ -172,30 +224,35 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#666',
     textAlign: 'center',
-    paddingHorizontal: 20,
+    lineHeight: 22,
+    opacity: 0.8,
   },
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginTop: 20,
-    paddingHorizontal: 10,
+    marginTop: 10,
+    paddingHorizontal: 5,
   },
   mainButton: {
     width: '100%',
-    height: 120,
-    borderRadius: 20,
+    height: 110,
+    borderRadius: 24,
     marginBottom: 20,
-    backgroundColor: '#DDDBFF',
-    elevation: 12,
     shadowColor: '#2F4FCD',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
     shadowRadius: 16,
-    overflow: 'hidden',
+    elevation: 12,
+  },
+  mainButtonBase: {
+    flex: 1,
+    borderRadius: 24,
+    padding: 3,
   },
   mainButtonGradient: {
     flex: 1,
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -204,21 +261,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 25,
   },
   mainIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    width: 55,
+    height: 55,
+    borderRadius: 27.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
-    elevation: 4,
+    marginRight: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
+    elevation: 6,
   },
   mainTextContainer: {
     flex: 1,
@@ -226,31 +283,35 @@ const styles = StyleSheet.create({
   },
   mainButtonText: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: 'System',
     fontWeight: '700',
     textAlign: 'left',
   },
   mainButtonSubtext: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 13,
     fontFamily: 'System',
-    fontWeight: '400',
+    fontWeight: '500',
     textAlign: 'left',
-    marginTop: 4,
+    marginTop: 3,
   },
   actionButton: {
     width: '48%',
-    height: 120,
-    borderRadius: 16,
+    height: 110,
+    borderRadius: 20,
     marginBottom: 20,
-    backgroundColor: '#DDDBFF',
-    elevation: 8,
     shadowColor: '#2F4FCD',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
     shadowRadius: 12,
-    overflow: 'hidden',
+    elevation: 8,
+  },
+  actionButtonGradient: {
+    flex: 1,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   actionButtonContent: {
     flex: 1,
@@ -259,38 +320,41 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   actionIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(47, 79, 205, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
-    elevation: 4,
-    shadowColor: '#000',
+    marginBottom: 5,
+    shadowColor: '#2F4FCD',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 6,
   },
   actionButtonText: {
     color: '#2F4FCD',
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'System',
     fontWeight: '600',
     textAlign: 'center',
   },
   settingsButton: {
     width: '48%',
-    height: 120,
-    borderRadius: 16,
+    height: 110,
+    borderRadius: 20,
     marginBottom: 20,
-    backgroundColor: '#F5F5F7',
-    elevation: 4,
-    shadowColor: '#666',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    overflow: 'hidden',
+    shadowColor: '#999',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  settingsButtonGradient: {
+    flex: 1,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   settingsButtonContent: {
     flex: 1,
@@ -299,27 +363,24 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   settingsIconContainer: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(102, 102, 102, 0.06)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 5,
+    shadowColor: '#666',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
   },
   settingsButtonText: {
     color: '#666',
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'System',
     fontWeight: '500',
     textAlign: 'center',
-  },
-  logoutButton: {
-    padding: 8,
   },
 });

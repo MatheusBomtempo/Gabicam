@@ -9,24 +9,27 @@ router.use(authMiddleware);
 // Rota para criar uma nova prova
 router.post('/criar-prova', async (req, res) => {
   try {
-    const { nome, gabarito } = req.body;
+    const { nome, gabarito, nota_por_questao } = req.body;
     const usuarioId = req.user.id;
 
     console.log('Recebendo requisição para criar prova:', {
       nome,
       usuarioId,
-      gabarito: gabarito ? 'presente' : 'ausente'
+      gabarito: gabarito ? 'presente' : 'ausente',
+      nota_por_questao
     });
 
     // Validar dados obrigatórios
     if (!nome || nome.trim() === '') {
       return res.status(400).json({ error: 'Nome da prova é obrigatório' });
     }
+    // Validar nota_por_questao
+    const notaPorQuestao = (nota_por_questao !== undefined && nota_por_questao !== null && nota_por_questao !== '') ? Number(nota_por_questao) : 1.0;
 
     // Inserir a prova no banco de dados
     const [insertResult] = await db.query(
-      'INSERT INTO provas (usuario_id, nome, gabarito, data_criacao) VALUES (?, ?, ?, NOW())',
-      [usuarioId, nome.trim(), gabarito ? JSON.stringify(gabarito) : null]
+      'INSERT INTO provas (usuario_id, nome, gabarito, data_criacao, nota_por_questao) VALUES (?, ?, ?, NOW(), ?)',
+      [usuarioId, nome.trim(), gabarito ? JSON.stringify(gabarito) : null, notaPorQuestao]
     );
 
     const novaProva = {
@@ -34,7 +37,8 @@ router.post('/criar-prova', async (req, res) => {
       usuario_id: usuarioId,
       nome: nome.trim(),
       gabarito: gabarito,
-      data_criacao: new Date().toISOString()
+      data_criacao: new Date().toISOString(),
+      nota_por_questao: notaPorQuestao
     };
 
     console.log('Prova criada com sucesso:', novaProva);
@@ -55,24 +59,25 @@ router.post('/criar-prova', async (req, res) => {
 router.put('/atualizar-gabarito/:provaId', async (req, res) => {
   try {
     const { provaId } = req.params;
-    const { nome, gabarito } = req.body;
+    const { nome, gabarito, nota_por_questao } = req.body;
     const usuarioId = req.user.id;
 
     console.log('Recebendo requisição para atualizar gabarito:', {
       provaId,
       usuarioId,
       nome,
-      gabarito: gabarito ? 'presente' : 'ausente'
+      gabarito: gabarito ? 'presente' : 'ausente',
+      nota_por_questao
     });
 
     // Validar dados obrigatórios
     if (!nome || nome.trim() === '') {
       return res.status(400).json({ error: 'Nome da prova é obrigatório' });
     }
-
     if (!gabarito || !Array.isArray(gabarito) || gabarito.length === 0) {
       return res.status(400).json({ error: 'Gabarito é obrigatório e deve ser um array' });
     }
+    const notaPorQuestao = (nota_por_questao !== undefined && nota_por_questao !== null && nota_por_questao !== '') ? Number(nota_por_questao) : 1.0;
 
     // Verificar se a prova existe e pertence ao usuário
     const [provas] = await db.query(
@@ -84,10 +89,10 @@ router.put('/atualizar-gabarito/:provaId', async (req, res) => {
       return res.status(404).json({ error: 'Prova não encontrada' });
     }
 
-    // Atualizar a prova com o gabarito
+    // Atualizar a prova com o gabarito e nota_por_questao
     await db.query(
-      'UPDATE provas SET nome = ?, gabarito = ? WHERE id = ? AND usuario_id = ?',
-      [nome.trim(), JSON.stringify(gabarito), provaId, usuarioId]
+      'UPDATE provas SET nome = ?, gabarito = ?, nota_por_questao = ? WHERE id = ? AND usuario_id = ?',
+      [nome.trim(), JSON.stringify(gabarito), notaPorQuestao, provaId, usuarioId]
     );
 
     console.log('Gabarito atualizado com sucesso para a prova:', provaId);
@@ -96,7 +101,8 @@ router.put('/atualizar-gabarito/:provaId', async (req, res) => {
       prova: {
         id: provaId,
         nome: nome.trim(),
-        gabarito: gabarito
+        gabarito: gabarito,
+        nota_por_questao: notaPorQuestao
       }
     });
   } catch (error) {

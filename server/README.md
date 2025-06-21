@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS provas (
     nome VARCHAR(100) NOT NULL,
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     gabarito JSON,
+    nota_por_questao DECIMAL(5,2) DEFAULT 1.00,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );
 

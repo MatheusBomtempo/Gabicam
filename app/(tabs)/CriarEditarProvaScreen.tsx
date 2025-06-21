@@ -26,6 +26,8 @@ interface Prova {
   nome: string;
   dataCriacao: string;
   fotos: string[];
+  nota_por_questao?: number;
+  gabarito?: string[];
 }
 
 const STORAGE_KEY = '@GabaritoApp:provas';
@@ -40,6 +42,8 @@ export default function CriarEditarProvaScreen() {
   const [isCreating, setIsCreating] = useState(false);
   const { user } = useAuth();
   const router = useRouter();
+  const [notaPorQuestao, setNotaPorQuestao] = useState('');
+  const [notaPorQuestaoEdicao, setNotaPorQuestaoEdicao] = useState('');
 
   // Carregar provas do AsyncStorage quando o componente montar
   useEffect(() => {
@@ -75,54 +79,51 @@ export default function CriarEditarProvaScreen() {
       Alert.alert('Erro', 'O nome da prova não pode estar vazio');
       return;
     }
-
     if (!user) {
       Alert.alert('Erro', 'Usuário não autenticado');
       return;
     }
-
+    if (isNaN(Number(notaPorQuestao)) || Number(notaPorQuestao) <= 0) {
+      Alert.alert('Erro', 'A nota por questão deve ser um número maior que zero');
+      return;
+    }
     setIsCreating(true);
     try {
       // Criar prova no banco de dados
       const response = await api.post('/api/provas/criar-prova', {
         nome: novaProva.trim(),
-        gabarito: null // Será definido posteriormente na tela de gabarito
+        gabarito: null, // Será definido posteriormente na tela de gabarito
+        nota_por_questao: Number(notaPorQuestao)
       });
-
       const provaCriada = response.data.prova;
-      
       // Criar objeto para armazenamento local
       const novaProvaObj: Prova = {
         id: provaCriada.id.toString(),
         nome: provaCriada.nome,
         dataCriacao: new Date(provaCriada.data_criacao).toLocaleDateString('pt-BR'),
         fotos: [],
+        nota_por_questao: provaCriada.nota_por_questao
       };
-
       // Atualizar estado local
       const provasAtualizadas = [...provas, novaProvaObj];
       setProvas(provasAtualizadas);
       await salvarProvas(provasAtualizadas);
-      
       setNovaProva('');
+      setNotaPorQuestao('');
       setModalVisible(false);
-      
       // Redirecionar automaticamente para a tela de criar gabarito
       router.push({
         pathname: '/CadastrarQuestoes',
         params: { provaId: provaCriada.id.toString() }
       });
-      
     } catch (error: any) {
       console.error('Erro ao criar prova:', error);
       let errorMessage = 'Não foi possível criar a prova.';
-      
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
       Alert.alert('Erro', errorMessage);
     } finally {
       setIsCreating(false);
@@ -136,14 +137,31 @@ export default function CriarEditarProvaScreen() {
       Alert.alert('Erro', 'O nome da prova não pode estar vazio');
       return;
     }
-
-    const provasAtualizadas = provas.map((p) => 
-      p.id === provaEmEdicao.id ? provaEmEdicao : p
-    );
-    setProvas(provasAtualizadas);
-    await salvarProvas(provasAtualizadas);
-    setEditModalVisible(false);
-    setProvaEmEdicao(null);
+    if (isNaN(Number(notaPorQuestaoEdicao)) || Number(notaPorQuestaoEdicao) <= 0) {
+      Alert.alert('Erro', 'O valor por questão deve ser um número maior que zero');
+      return;
+    }
+    try {
+      // Buscar o gabarito atual da prova (se existir)
+      const gabarito = provaEmEdicao.gabarito || [];
+      // Atualizar no backend usando o endpoint correto
+      await api.put(`/api/provas/atualizar-gabarito/${provaEmEdicao.id}`, {
+        nome: provaEmEdicao.nome,
+        gabarito,
+        nota_por_questao: Number(notaPorQuestaoEdicao)
+      });
+      // Atualizar localmente
+      const provasAtualizadas = provas.map((p) =>
+        p.id === provaEmEdicao.id ? { ...provaEmEdicao, nota_por_questao: Number(notaPorQuestaoEdicao) } : p
+      );
+      setProvas(provasAtualizadas);
+      await salvarProvas(provasAtualizadas);
+      setEditModalVisible(false);
+      setProvaEmEdicao(null);
+      setNotaPorQuestaoEdicao('');
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível atualizar o valor da questão');
+    }
   };
 
   // Função para apagar uma prova
@@ -232,6 +250,11 @@ export default function CriarEditarProvaScreen() {
                       {item.fotos.length} foto
                       {item.fotos.length !== 1 ? 's' : ''}
                     </Text>
+                    {item.nota_por_questao !== undefined && (
+                      <Text style={styles.provaFotos}>
+                        Valor por questão: {item.nota_por_questao}
+                      </Text>
+                    )}
                   </View>
                 </View>
                 <Feather name="more-vertical" size={24} color="#2F4FCD" />
@@ -256,12 +279,13 @@ export default function CriarEditarProvaScreen() {
                     style={styles.actionButton}
                     onPress={() => {
                       setProvaEmEdicao(item);
+                      setNotaPorQuestaoEdicao(item.nota_por_questao ? String(item.nota_por_questao) : '');
                       setEditModalVisible(true);
                       setActionMenuVisible(null);
                     }}
                   >
                     <Feather name="edit" size={18} color="#2F4FCD" />
-                    <Text style={styles.actionText}>Renomear</Text>
+                    <Text style={styles.actionText}>Editar nome e nota</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -290,7 +314,6 @@ export default function CriarEditarProvaScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Nova Prova</Text>
-
             <TextInput
               style={styles.input}
               placeholder="Nome da prova"
@@ -299,13 +322,21 @@ export default function CriarEditarProvaScreen() {
               autoFocus
               editable={!isCreating}
             />
-
+            <TextInput
+              style={styles.input}
+              placeholder="Nota por questão (ex: 1.0)"
+              value={notaPorQuestao}
+              onChangeText={setNotaPorQuestao}
+              keyboardType="numeric"
+              editable={!isCreating}
+            />
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   if (!isCreating) {
                     setNovaProva('');
+                    setNotaPorQuestao('1');
                     setModalVisible(false);
                   }
                 }}
@@ -313,7 +344,6 @@ export default function CriarEditarProvaScreen() {
               >
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.modalButton, styles.confirmButton, isCreating && styles.disabledButton]}
                 onPress={criarNovaProva}
@@ -339,8 +369,7 @@ export default function CriarEditarProvaScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Renomear Prova</Text>
-
+            <Text style={styles.modalTitle}>Editar Prova</Text>
             <TextInput
               style={styles.input}
               placeholder="Nome da prova"
@@ -352,18 +381,24 @@ export default function CriarEditarProvaScreen() {
               }
               autoFocus
             />
-
+            <TextInput
+              style={styles.input}
+              placeholder="Valor por questão (ex: 1.0)"
+              value={notaPorQuestaoEdicao}
+              onChangeText={setNotaPorQuestaoEdicao}
+              keyboardType="numeric"
+            />
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setProvaEmEdicao(null);
                   setEditModalVisible(false);
+                  setNotaPorQuestaoEdicao('');
                 }}
               >
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.modalButton, styles.confirmButton]}
                 onPress={renomearProva}

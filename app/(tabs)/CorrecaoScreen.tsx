@@ -27,6 +27,7 @@ interface Prova {
   dataCriacao: string;
   fotos: string[];
   gabarito?: string[];
+  nota_por_questao?: number;
 }
 
 interface ImagemCapturada {
@@ -192,6 +193,7 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
           await salvarImagens(imagensRevertidas);
           return;
         }
+        const notaPorQuestao = prova.nota_por_questao || 1;
 
         // Normalizar a imagem antes de enviar
         const normalizedImageUri = await normalizeImage(item.imageUri);
@@ -273,7 +275,7 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
             resultado: {
               acertos: resultado.acertos,
               total: resultado.total_questoes,
-              nota: (resultado.acertos / resultado.total_questoes) * 10
+              nota: resultado.acertos * notaPorQuestao
             }
           } : img
         );
@@ -292,7 +294,7 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
                 resultado: {
                   acertos: resultado.acertos,
                   total: resultado.total_questoes,
-                  nota: (resultado.acertos / resultado.total_questoes) * 10
+                  nota: resultado.acertos * notaPorQuestao
                 }
               } : p
             );
@@ -305,7 +307,7 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
         
         Alert.alert(
           'Correção Concluída',
-          `Aluno: ${item.nomeAluno}\nNota: ${((resultado.acertos / resultado.total_questoes) * 10).toFixed(1)}\nAcertos: ${resultado.acertos}/${resultado.total_questoes}`
+          `Aluno: ${item.nomeAluno}\nNota: ${(resultado.acertos * notaPorQuestao).toFixed(1)}\nAcertos: ${resultado.acertos}/${resultado.total_questoes}`
         );
         
       } catch (error: any) {
@@ -347,9 +349,11 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
       }
     } else if (item.status === 'corrigido') {
       // Mostrar detalhes da correção
+      const prova = provas.find(p => p.id === item.provaId);
+      const notaPorQuestao = prova?.nota_por_questao || 1;
       Alert.alert(
         'Detalhes da Correção',
-        `Aluno: ${item.nomeAluno}\nProva: ${item.nomeProva}\nNota: ${item.resultado?.nota.toFixed(1)}\nAcertos: ${item.resultado?.acertos}/${item.resultado?.total}`
+        `Aluno: ${item.nomeAluno}\nProva: ${item.nomeProva}\nNota: ${((item.resultado?.acertos || 0) * notaPorQuestao).toFixed(1)}\nAcertos: ${item.resultado?.acertos}/${item.resultado?.total}`
       );
     } else if (item.status === 'em_analise') {
       Alert.alert(
@@ -626,7 +630,7 @@ const normalizeImage = async (imageUri: string): Promise<string> => {
                         {item.status === 'corrigido' && item.resultado && (
                           <View style={styles.resultadoContainer}>
                             <Text style={styles.resultadoText}>
-                              Nota: <Text style={styles.notaText}>{item.resultado.nota.toFixed(1)}</Text>
+                              Nota: <Text style={styles.notaText}>{((item.resultado.acertos || 0) * (provas.find(p => p.id === item.provaId)?.nota_por_questao || 1)).toFixed(1)}</Text>
                             </Text>
                             <Text style={styles.acertosText}>
                               {item.resultado.acertos}/{item.resultado.total} acertos
