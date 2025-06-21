@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS provas (
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     gabarito JSON,
     nota_por_questao DECIMAL(5,2) DEFAULT 1.00,
+    media_geral FLOAT DEFAULT 0,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );
 
@@ -48,50 +49,48 @@ CREATE TABLE IF NOT EXISTS imagens_provas (
     nota DECIMAL(4,2) DEFAULT 0.00,
     FOREIGN KEY (prova_id) REFERENCES provas(id) ON DELETE CASCADE,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-); 
-```
+);
 
-3. Configure as variáveis de ambiente:
-- Crie um arquivo `.env` na raiz do projeto
-- Adicione as seguintes variáveis:
-```
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=gabicam_db
-PORT=5000
-```
+-- Triggers para atualizar a média geral da prova automaticamente
+DELIMITER $$
+CREATE TRIGGER atualizar_media_geral_after_insert
+AFTER INSERT ON imagens_provas
+FOR EACH ROW
+BEGIN
+  UPDATE provas
+  SET media_geral = (
+    SELECT AVG(nota)
+    FROM imagens_provas
+    WHERE prova_id = NEW.prova_id
+  )
+  WHERE id = NEW.prova_id;
+END$$
 
-## Executando o servidor
+CREATE TRIGGER atualizar_media_geral_after_update
+AFTER UPDATE ON imagens_provas
+FOR EACH ROW
+BEGIN
+  UPDATE provas
+  SET media_geral = (
+    SELECT AVG(nota)
+    FROM imagens_provas
+    WHERE prova_id = NEW.prova_id
+  )
+  WHERE id = NEW.prova_id;
+END$$
 
-Para desenvolvimento:
-```bash
-npm run dev
-```
+CREATE TRIGGER atualizar_media_geral_after_delete
+AFTER DELETE ON imagens_provas
+FOR EACH ROW
+BEGIN
+  UPDATE provas
+  SET media_geral = (
+    SELECT AVG(nota)
+    FROM imagens_provas
+    WHERE prova_id = OLD.prova_id
+  )
+  WHERE id = OLD.prova_id;
+END$$
+DELIMITER ;
 
-Para produção:
-```bash
-npm start
-```
-
-## Rotas da API
-
-### Autenticação
-
-#### Login
-- POST `/api/login`
-- Body: `{ "matricula": "string", "senha": "string" }`
-
-#### Cadastro
-- POST `/api/cadastro`
-- Body: `{ "matricula": "string", "nome": "string", "senha": "string" }`
-
-### Provas
-
-#### Salvar Resultados
-- POST `/api/provas/salvar-resultados`
-- Body: `{ "provaId": "string", "resultados": [{ "nomeAluno": "string", "acertos": number, "total": number, "nota": number }] }`
-
-### Teste
-- GET `/test`
-- Retorna uma mensagem confirmando que a API está funcionando 
+-- As triggers acima garantem que o campo media_geral da tabela provas estará sempre atualizado automaticamente sempre que um resultado for inserido, atualizado ou removido em imagens_provas. 
