@@ -273,4 +273,25 @@ router.get('/ultimo-salvamento/:provaId', async (req, res) => {
   }
 });
 
+// Rota para buscar todos os resultados das provas do usuário
+router.get('/resultados', async (req, res) => {
+  try {
+    const usuarioId = req.user.id;
+    // Buscar resultados das provas do usuário
+    const [resultados] = await db.query(
+      `SELECT ip.id, ip.prova_id, ip.nome_aluno, ip.data_criacao, ip.status, ip.acertos, ip.total_questoes, ip.nota, p.nome as nome_prova, p.media_geral, u.nome as nome_usuario
+       FROM imagens_provas ip
+       JOIN provas p ON ip.prova_id = p.id
+       JOIN usuarios u ON p.usuario_id = u.id
+       WHERE ip.usuario_id = ?
+       ORDER BY ip.data_criacao DESC`,
+      [usuarioId]
+    );
+    res.json({ resultados });
+  } catch (error) {
+    console.error('Erro ao buscar resultados:', error);
+    res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
+  }
+});
+
 module.exports = router; 

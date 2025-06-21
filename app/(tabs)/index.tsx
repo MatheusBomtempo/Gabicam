@@ -128,6 +128,25 @@ export default function Home() {
           </LinearGradient>
         </TouchableOpacity>
 
+        {/* Resultados - Estatísticas */}
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => router.push('/ResultadosScreen')}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={['#ffffff', '#f8f9ff']}
+            style={styles.actionButtonGradient}
+          >
+            <View style={styles.actionButtonContent}>
+              <View style={styles.actionIconContainer}>
+                <Feather name="bar-chart-2" size={24} color="#2F4FCD" />
+              </View>
+              <Text style={styles.actionButtonText}>Resultados</Text>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+
         {/* Configurações - Funcionalidade Isolada */}
         <TouchableOpacity 
           style={styles.settingsButton}
